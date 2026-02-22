@@ -18,13 +18,13 @@
             │  checkpoint.sh "msg" "prompt"
             ▼
 ┌──────────────────────────────────────┐
-│  Commit 脚本 (checkpoint.sh)         │
+│  Commit 脚本                         │
 │  截断 prompt、追加 trailers、        │
 │  git add -A && git commit            │
 └──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│  Stop Hook (check_uncommitted.py)    │
+│  Stop Hook                           │
 │  对话结束时：                        │
 │  git status → 有未提交？→ 提醒       │
 └──────────────────────────────────────┘
@@ -35,8 +35,8 @@
 | 组件 | 职责 | 触发方式 |
 |------|------|----------|
 | **Skill** (`SKILL.md`) | 引导 AI Agent 在每次有意义的编辑后自主 commit | AI 在会话开始时读取 |
-| **Commit 脚本** (`checkpoint.sh`) | 追加 Git Trailers（Agent、Checkpoint-Type、User-Prompt）并执行 `git commit` | 由 AI 编写消息后调用 |
-| **Stop Hook** (`check_uncommitted.py`) | 安全网——对话结束时检测未提交的变更 | 平台 stop hook 触发 |
+| **Commit 脚本** (`checkpoint.sh` / `.ps1`) | 追加 Git Trailers（Agent、Checkpoint-Type、User-Prompt）并执行 `git commit` | 由 AI 编写消息后调用 |
+| **Stop Hook** (`check_uncommitted.sh` / `.ps1`) | 安全网——对话结束时检测未提交的变更 | 平台 stop hook 触发 |
 
 ## Commit Message 示例
 
@@ -69,33 +69,41 @@ git log --grep="User-Prompt:.*registration"
 ### 前置条件
 
 - Git ≥ 2.0
-- Python ≥ 3.8
+- Node.js ≥ 18（仅安装时需要）
 - 已安装 [Cursor](https://cursor.com) 或 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 
 ### 快速安装
 
 ```bash
-git clone https://github.com/alienzhou/agent-better-checkpoint.git
-cd agent-better-checkpoint
-python src/install.py
+npx @vibe-x/agent-better-checkpoint
 ```
 
-安装器会自动检测平台，也可以手动指定：
+安装器会自动检测 OS 和 AI 平台，也可以手动指定：
 
 ```bash
 # Cursor
-python src/install.py --platform cursor
+npx @vibe-x/agent-better-checkpoint --platform cursor
 
 # Claude Code
-python src/install.py --platform claude
+npx @vibe-x/agent-better-checkpoint --platform claude
 ```
+
+### 通过 skills.sh 安装
+
+如果你使用 [skills.sh](https://skills.sh)：
+
+```bash
+npx skills add alienzhou/agent-better-checkpoint
+```
+
+skills.sh 安装 SKILL.md 后，AI Agent 会检测到运行时脚本缺失并自动通过 `npx @vibe-x/agent-better-checkpoint` 完成引导安装。
 
 ### 安装内容
 
 | 目标位置 | 内容 |
 |----------|------|
-| `~/.agent-better-checkpoint/scripts/` | `checkpoint.sh` — commit 脚本 |
-| `~/.agent-better-checkpoint/hooks/stop/` | `check_uncommitted.py` — stop hook |
+| `~/.agent-better-checkpoint/scripts/` | `checkpoint.sh` / `.ps1` — commit 脚本 |
+| `~/.agent-better-checkpoint/hooks/stop/` | `check_uncommitted.sh` / `.ps1` — stop hook |
 | `~/.cursor/skills/agent-better-checkpoint/` | `SKILL.md`（仅 Cursor） |
 | `~/.cursor/hooks.json` | Stop hook 注册（仅 Cursor） |
 | `~/.claude/commands/` | `agent-better-checkpoint.md`（仅 Claude Code） |
@@ -104,21 +112,27 @@ python src/install.py --platform claude
 ### 卸载
 
 ```bash
-python src/install.py --uninstall
+npx @vibe-x/agent-better-checkpoint --uninstall
 ```
 
 ## 项目结构
 
 ```
-src/
+├── package.json                        # npm 包配置
+├── bin/
+│   └── cli.mjs                         # npx 入口（安装器）
+├── platform/
+│   ├── unix/
+│   │   ├── checkpoint.sh               # Bash: checkpoint commit
+│   │   └── check_uncommitted.sh        # Bash: stop hook
+│   └── win/
+│       ├── checkpoint.ps1              # PowerShell: checkpoint commit
+│       └── check_uncommitted.ps1       # PowerShell: stop hook
 ├── skill/
-│   └── SKILL.md                  # AI Agent 指令
-├── scripts/
-│   └── checkpoint.sh             # Commit 脚本（trailer 注入）
-├── hooks/
-│   └── stop/
-│       └── check_uncommitted.py  # Stop hook（未提交变更检测）
-└── install.py                    # 跨平台安装器
+│   └── SKILL.md                        # AI Agent 指令
+├── LICENSE
+├── README.md
+└── README_zh.md
 ```
 
 ## 设计决策
@@ -131,13 +145,14 @@ src/
 | [D02 — AI/脚本职责划分](/.discuss/2026-02-21/agent-better-checkpoint/decisions/D02-ai-script-responsibility.md) | AI 生成描述；脚本追加元信息 |
 | [D03 — Commit 格式](/.discuss/2026-02-21/agent-better-checkpoint/decisions/D03-commit-message-format.md) | Conventional Commits + Git Trailers |
 | [D06 — MVP 范围](/.discuss/2026-02-21/agent-better-checkpoint/decisions/D06-mvp-scope.md) | Skill + Commit 脚本 + Stop Hook |
+| [D01 — 发布策略](/.discuss/2026-02-22/publish-to-skills-sh/decisions/D01-publish-strategy.md) | npm + skills.sh，Node.js 安装器 + 原生 shell 脚本 |
 
 ## 平台支持
 
-| 平台 | Skill | Stop Hook | 状态 |
-|------|-------|-----------|------|
-| Cursor | `.cursor/skills/` | `stop` hook | ✅ 已支持 |
-| Claude Code | `.claude/commands/` | `Stop` hook | ✅ 已支持 |
+| 平台 | Skill | Stop Hook | 操作系统 |
+|------|-------|-----------|----------|
+| Cursor | `.cursor/skills/` | `stop` hook | macOS、Linux、Windows |
+| Claude Code | `.claude/commands/` | `Stop` hook | macOS、Linux、Windows |
 
 ## 路线图
 

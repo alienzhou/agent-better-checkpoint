@@ -18,13 +18,13 @@ When AI coding assistants (Cursor, Claude Code, etc.) edit your code, their buil
             │  checkpoint.sh "msg" "prompt"
             ▼
 ┌──────────────────────────────────────┐
-│  Commit Script (checkpoint.sh)       │
+│  Commit Script                       │
 │  Truncate prompt, append trailers,   │
 │  git add -A && git commit            │
 └──────────────────────────────────────┘
 
 ┌──────────────────────────────────────┐
-│  Stop Hook (check_uncommitted.py)    │
+│  Stop Hook                           │
 │  On conversation end:                │
 │  git status → uncommitted? → remind  │
 └──────────────────────────────────────┘
@@ -35,8 +35,8 @@ When AI coding assistants (Cursor, Claude Code, etc.) edit your code, their buil
 | Component | Role | Trigger |
 |-----------|------|---------|
 | **Skill** (`SKILL.md`) | Guides the AI agent to commit autonomously after each meaningful edit | AI reads it at session start |
-| **Commit Script** (`checkpoint.sh`) | Appends Git Trailers (Agent, Checkpoint-Type, User-Prompt) and runs `git commit` | Called by AI after composing a message |
-| **Stop Hook** (`check_uncommitted.py`) | Safety net — detects uncommitted changes when conversation ends | Platform stop hook |
+| **Commit Script** (`checkpoint.sh` / `.ps1`) | Appends Git Trailers (Agent, Checkpoint-Type, User-Prompt) and runs `git commit` | Called by AI after composing a message |
+| **Stop Hook** (`check_uncommitted.sh` / `.ps1`) | Safety net — detects uncommitted changes when conversation ends | Platform stop hook |
 
 ## Commit Message Example
 
@@ -69,33 +69,41 @@ git log --grep="User-Prompt:.*registration"
 ### Prerequisites
 
 - Git ≥ 2.0
-- Python ≥ 3.8
+- Node.js ≥ 18 (only needed for installation)
 - One of: [Cursor](https://cursor.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
 
 ### Quick Install
 
 ```bash
-git clone https://github.com/alienzhou/agent-better-checkpoint.git
-cd agent-better-checkpoint
-python src/install.py
+npx @vibe-x/agent-better-checkpoint
 ```
 
-The installer auto-detects your platform. To specify explicitly:
+The installer auto-detects your OS and AI platform. To specify explicitly:
 
 ```bash
 # For Cursor
-python src/install.py --platform cursor
+npx @vibe-x/agent-better-checkpoint --platform cursor
 
 # For Claude Code
-python src/install.py --platform claude
+npx @vibe-x/agent-better-checkpoint --platform claude
 ```
+
+### Install via skills.sh
+
+If you use [skills.sh](https://skills.sh):
+
+```bash
+npx skills add alienzhou/agent-better-checkpoint
+```
+
+After skills.sh installs the SKILL.md, the AI agent will detect that runtime scripts are missing and auto-bootstrap via `npx @vibe-x/agent-better-checkpoint`.
 
 ### What Gets Installed
 
 | Destination | Content |
 |-------------|---------|
-| `~/.agent-better-checkpoint/scripts/` | `checkpoint.sh` — the commit script |
-| `~/.agent-better-checkpoint/hooks/stop/` | `check_uncommitted.py` — the stop hook |
+| `~/.agent-better-checkpoint/scripts/` | `checkpoint.sh` / `.ps1` — the commit script |
+| `~/.agent-better-checkpoint/hooks/stop/` | `check_uncommitted.sh` / `.ps1` — the stop hook |
 | `~/.cursor/skills/agent-better-checkpoint/` | `SKILL.md` (Cursor only) |
 | `~/.cursor/hooks.json` | Stop hook registration (Cursor only) |
 | `~/.claude/commands/` | `agent-better-checkpoint.md` (Claude Code only) |
@@ -104,21 +112,27 @@ python src/install.py --platform claude
 ### Uninstall
 
 ```bash
-python src/install.py --uninstall
+npx @vibe-x/agent-better-checkpoint --uninstall
 ```
 
 ## Project Structure
 
 ```
-src/
+├── package.json                        # npm package config
+├── bin/
+│   └── cli.mjs                         # npx entry point (installer)
+├── platform/
+│   ├── unix/
+│   │   ├── checkpoint.sh               # Bash: checkpoint commit
+│   │   └── check_uncommitted.sh        # Bash: stop hook
+│   └── win/
+│       ├── checkpoint.ps1              # PowerShell: checkpoint commit
+│       └── check_uncommitted.ps1       # PowerShell: stop hook
 ├── skill/
-│   └── SKILL.md                  # AI agent instructions
-├── scripts/
-│   └── checkpoint.sh             # Commit script (trailer injection)
-├── hooks/
-│   └── stop/
-│       └── check_uncommitted.py  # Stop hook (uncommitted change detection)
-└── install.py                    # Cross-platform installer
+│   └── SKILL.md                        # AI agent instructions
+├── LICENSE
+├── README.md
+└── README_zh.md
 ```
 
 ## Design Decisions
@@ -131,13 +145,14 @@ This project went through a structured discussion process. Key decisions are doc
 | [D02 — AI/Script Split](/.discuss/2026-02-21/agent-better-checkpoint/decisions/D02-ai-script-responsibility.md) | AI generates descriptions; script appends metadata |
 | [D03 — Commit Format](/.discuss/2026-02-21/agent-better-checkpoint/decisions/D03-commit-message-format.md) | Conventional Commits + Git Trailers |
 | [D06 — MVP Scope](/.discuss/2026-02-21/agent-better-checkpoint/decisions/D06-mvp-scope.md) | Skill + Commit Script + Stop Hook |
+| [D01 — Publish Strategy](/.discuss/2026-02-22/publish-to-skills-sh/decisions/D01-publish-strategy.md) | npm + skills.sh, Node.js installer + native shell scripts |
 
 ## Platform Support
 
-| Platform | Skill | Stop Hook | Status |
-|----------|-------|-----------|--------|
-| Cursor | `.cursor/skills/` | `stop` hook | ✅ Supported |
-| Claude Code | `.claude/commands/` | `Stop` hook | ✅ Supported |
+| Platform | Skill | Stop Hook | OS |
+|----------|-------|-----------|-----|
+| Cursor | `.cursor/skills/` | `stop` hook | macOS, Linux, Windows |
+| Claude Code | `.claude/commands/` | `Stop` hook | macOS, Linux, Windows |
 
 ## Roadmap
 
