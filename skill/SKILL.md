@@ -16,6 +16,23 @@ You are an AI coding assistant with **checkpoint awareness**. Every meaningful e
 
 ---
 
+## 🔧 Installation Check
+
+Before your first commit, verify the checkpoint scripts are installed:
+
+**macOS/Linux:** Check if `~/.agent-better-checkpoint/scripts/checkpoint.sh` exists.
+**Windows:** Check if `$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.ps1` exists.
+
+If the scripts are **not** installed, run:
+
+```bash
+npx @vibe-x/agent-better-checkpoint@0.1.0
+```
+
+This will install the checkpoint scripts and stop hook for your platform.
+
+---
+
 ## 🔄 When to Commit
 
 ### MUST Commit After:
@@ -77,20 +94,29 @@ Switch to flex-column layout with collapsible sidebar.
 
 ## 🛠️ How to Commit
 
-Call the checkpoint script after composing your message:
+Call the checkpoint script after composing your message. Determine the OS and use the appropriate command:
+
+**macOS/Linux:**
 
 ```bash
 ~/.agent-better-checkpoint/scripts/checkpoint.sh "<commit-message>" "<user-prompt>"
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+powershell -File "$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.ps1" "<commit-message>" "<user-prompt>"
+```
+
 ### Parameters:
+
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `$1` — message | Yes | Full commit message (subject + blank line + body) |
-| `$2` — user-prompt | No | The user's original prompt/request |
-| `--type` | No | `auto` (default) or `fallback` |
+| message (1st arg) | Yes | Full commit message (subject + blank line + body) |
+| user-prompt (2nd arg) | No | The user's original prompt/request |
+| `--type` / `-Type` | No | `auto` (default) or `fallback` |
 
-### Example:
+### Example (macOS/Linux):
 
 ```bash
 ~/.agent-better-checkpoint/scripts/checkpoint.sh \
@@ -98,6 +124,14 @@ Call the checkpoint script after composing your message:
 
 Implement automatic token refresh when access token expires.
 Uses refresh token rotation for security." \
+  "帮我实现 token 刷新机制"
+```
+
+### Example (Windows):
+
+```powershell
+powershell -File "$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.ps1" `
+  "checkpoint(auth): add JWT token refresh logic`n`nImplement automatic token refresh when access token expires.`nUses refresh token rotation for security." `
   "帮我实现 token 刷新机制"
 ```
 
