@@ -1,4 +1,4 @@
-# Agent Better Checkpoint
+# Agent Better Checkpoint (ABC)
 
 **One-line install, zero config.** Turns AI agent edits into transparent, queryable Git commits.
 
