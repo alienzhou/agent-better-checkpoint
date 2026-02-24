@@ -6,6 +6,8 @@
 npx @vibe-x/agent-better-checkpoint
 ```
 
+![Agent Better Checkpoint](./assets/agent-better-checkpoint.png)
+
 That's it. Your AI coding assistant (Cursor, Claude Code) will now auto-commit every meaningful edit with semantic messages and structured metadata — no more opaque checkpoints.
 
 ---
@@ -39,6 +41,19 @@ git log --grep="^checkpoint("                          # all checkpoints
 git log --format="%(trailers:key=Agent,valueonly)"     # by agent
 git log --grep="User-Prompt:.*registration"            # by prompt keyword
 ```
+
+### Works with Your Favorite Git Tools
+
+Since every checkpoint is a standard Git commit, the entire Git ecosystem is at your disposal — what was once a hidden, platform-specific checkpoint becomes a first-class citizen you can browse, search, diff, and rebase.
+
+| Tool | Type | What You Get |
+|------|------|-------------|
+| [GitLens](https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens) | VS Code / Cursor Extension | Inline blame, file history, visual commit graph, interactive rebase — see *who* (you or the AI) changed *what* and *when*, right in the editor |
+| [lazygit](https://github.com/jesseduffield/lazygit) | Terminal UI | Fast keyboard-driven staging, diff browsing, cherry-pick, and rebase across checkpoint commits |
+| [tig](https://github.com/jonas/tig) | Terminal UI | Lightweight ncurses Git log viewer, great for quickly scanning checkpoint history |
+| [GitHub / GitLab Web UI](https://github.com) | Web | Browse, compare, and share checkpoint history online after pushing |
+
+For example, with **GitLens in Cursor** you can hover any line to see which checkpoint introduced it and the original user prompt, view all checkpoints for a file in a timeline, or search commits by `checkpoint(` prefix and `User-Prompt` trailer content.
 
 ---
 
@@ -93,10 +108,12 @@ The AI agent will auto-bootstrap the runtime scripts on first use.
 
 | Location | Content |
 |----------|---------|
-| `~/.agent-better-checkpoint/scripts/` | Commit script (`checkpoint.sh` / `.ps1`) |
-| `~/.agent-better-checkpoint/hooks/stop/` | Stop hook (`check_uncommitted.sh` / `.ps1`) |
+| `~/.vibe-x/agent-better-checkpoint/scripts/` | Commit script (`checkpoint.sh` / `.ps1`) |
+| `~/.vibe-x/agent-better-checkpoint/hooks/stop/` | Stop hook (`check_uncommitted.sh` / `.ps1`) |
 | Platform skill directory | `SKILL.md` — AI agent instructions |
 | Platform hook config | Stop hook registration |
+
+> **Project-local mode**: Projects can also commit `.vibe-x/agent-better-checkpoint/` (config + scripts) for self-contained setup. When present, the global hook delegates to the project-local scripts automatically.
 
 ### Uninstall
 

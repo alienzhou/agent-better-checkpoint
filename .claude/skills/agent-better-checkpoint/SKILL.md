@@ -3,7 +3,7 @@ name: agent-better-checkpoint
 description: "Automatically creates semantic Git checkpoint commits during AI coding sessions. Replaces opaque platform checkpoints with transparent, queryable Git commits using Conventional Commits format with Git Trailers. You MUST follow this skill whenever you make code changes — commit after each meaningful edit."
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
   author: "alienzhou"
   category: "version-control"
 ---
@@ -18,18 +18,18 @@ You are an AI coding assistant with **checkpoint awareness**. Every meaningful e
 
 ## 🔧 Installation Check
 
-Before your first commit, verify the checkpoint scripts are installed:
+Before your first commit, verify the checkpoint scripts are available:
 
-**macOS/Linux:** Check if `~/.agent-better-checkpoint/scripts/checkpoint.sh` exists.
-**Windows:** Check if `$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.ps1` exists.
+**Project-local (preferred, committed with project):** Check if `.vibe-x/agent-better-checkpoint/checkpoint.sh` exists in the workspace.
+**Global fallback:** Check if `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` exists (macOS/Linux) or `$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1` (Windows).
 
-If the scripts are **not** installed, run:
+If neither exists, run:
 
 ```bash
-npx @vibe-x/agent-better-checkpoint@0.1.0
+npx @vibe-x/agent-better-checkpoint@0.1.1
 ```
 
-This will install the checkpoint scripts and stop hook for your platform.
+This installs the global scripts and stop hook. Projects can also commit `.vibe-x/agent-better-checkpoint/` (config + scripts) for self-contained setup.
 
 ---
 
@@ -94,18 +94,28 @@ Switch to flex-column layout with collapsible sidebar.
 
 ## 🛠️ How to Commit
 
-Call the checkpoint script after composing your message. Determine the OS and use the appropriate command:
+Call the checkpoint script after composing your message. Determine the OS and use the appropriate command.
+
+**Prefer project-local when present** (`.vibe-x/agent-better-checkpoint/` committed with project):
 
 **macOS/Linux:**
 
 ```bash
-~/.agent-better-checkpoint/scripts/checkpoint.sh "<commit-message>" "<user-prompt>"
+# Project-local (if .vibe-x/agent-better-checkpoint/ exists)
+.vibe-x/agent-better-checkpoint/checkpoint.sh "<commit-message>" "<user-prompt>"
+
+# Or global fallback
+~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh "<commit-message>" "<user-prompt>"
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-powershell -File "$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.ps1" "<commit-message>" "<user-prompt>"
+# Project-local (if .vibe-x/agent-better-checkpoint/ exists)
+powershell -File ".\.vibe-x\agent-better-checkpoint\checkpoint.ps1" "<commit-message>" "<user-prompt>"
+
+# Or global fallback
+powershell -File "$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1" "<commit-message>" "<user-prompt>"
 ```
 
 ### Parameters:
@@ -119,7 +129,7 @@ powershell -File "$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.p
 ### Example (macOS/Linux):
 
 ```bash
-~/.agent-better-checkpoint/scripts/checkpoint.sh \
+~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh \
   "checkpoint(auth): add JWT token refresh logic
 
 Implement automatic token refresh when access token expires.
@@ -130,7 +140,7 @@ Uses refresh token rotation for security." \
 ### Example (Windows):
 
 ```powershell
-powershell -File "$env:USERPROFILE/.agent-better-checkpoint/scripts/checkpoint.ps1" `
+powershell -File "$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1" `
   "checkpoint(auth): add JWT token refresh logic`n`nImplement automatic token refresh when access token expires.`nUses refresh token rotation for security." `
   "帮我实现 token 刷新机制"
 ```
@@ -167,4 +177,4 @@ This should feel natural — commit as you go, like any good developer.
 
 ---
 
-**Version**: 0.1.0
+**Version**: 0.1.1

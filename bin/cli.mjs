@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * agent-better-checkpoint 安装器 (Node.js)
+ * agent-better-checkpoint installer (Node.js)
  *
- * 通过 npx 一键安装 checkpoint 脚本、stop hook 和 SKILL.md 到用户环境。
- * 按平台（macOS/Linux vs Windows）选择性部署对应脚本。
+ * One-click install via npx: checkpoint scripts, stop hook, and SKILL.md to user env.
+ * Deploys platform-specific scripts (macOS/Linux vs Windows).
  *
  * Usage:
  *   npx @vibe-x/agent-better-checkpoint
@@ -18,22 +18,22 @@ import { homedir, platform } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 // ============================================================
-// 路径常量
+// Path constants
 // ============================================================
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PKG_ROOT = resolve(__dirname, '..');
 
-const INSTALL_BASE = join(homedir(), '.agent-better-checkpoint');
+const INSTALL_BASE = join(homedir(), '.vibe-x', 'agent-better-checkpoint');
 const SKILL_NAME = 'agent-better-checkpoint';
 
-// 包内源文件路径
+// In-package source paths
 const PLATFORM_DIR = join(PKG_ROOT, 'platform');
 const SKILL_SRC = join(PKG_ROOT, 'skill', 'SKILL.md');
 
 // ============================================================
-// 参数解析
+// Argument parsing
 // ============================================================
 
 function parseArgs(argv) {
@@ -79,12 +79,12 @@ Options:
 }
 
 // ============================================================
-// 平台检测
+// Platform detection
 // ============================================================
 
 function detectAIPlatform() {
   const home = homedir();
-  // 优先 Claude（如果两者都存在，用户可以用 --platform 覆盖）
+  // Prefer Claude (if both exist, user can override with --platform)
   if (existsSync(join(home, '.claude'))) return 'claude';
   if (existsSync(join(home, '.cursor'))) return 'cursor';
   return null;
@@ -97,7 +97,7 @@ function getOSType() {
 }
 
 // ============================================================
-// 文件操作辅助
+// File operation helpers
 // ============================================================
 
 function ensureDir(dir) {
@@ -116,7 +116,7 @@ function setExecutable(filepath) {
     const st = statSync(filepath);
     chmodSync(filepath, st.mode | 0o111);
   } catch {
-    // Windows 下 chmod 可能无效，忽略
+    // chmod may be ineffective on Windows, ignore
   }
 }
 
@@ -134,7 +134,7 @@ function writeJsonFile(filepath, data) {
 }
 
 // ============================================================
-// 安装逻辑
+// Install logic
 // ============================================================
 
 function installScripts(osType) {
@@ -176,7 +176,7 @@ function installSkill(aiPlatform) {
   let skillDest;
 
   if (aiPlatform === 'cursor') {
-    // 检查 skills.sh 安装路径
+    // Check skills.sh install path
     const skillsShPath = join(homedir(), '.cursor', 'skills', SKILL_NAME, 'SKILL.md');
     if (existsSync(skillsShPath)) {
       console.log(`  Skill   → already installed at ${skillsShPath} (skipped)`);
@@ -186,7 +186,7 @@ function installSkill(aiPlatform) {
     skillDir = join(homedir(), '.cursor', 'skills', SKILL_NAME);
     skillDest = join(skillDir, 'SKILL.md');
   } else if (aiPlatform === 'claude') {
-    // Claude Code: 按标准 skills 目录安装
+    // Claude Code: install to standard skills directory
     const skillsRootDir = join(homedir(), '.claude', 'skills');
     skillDir = join(skillsRootDir, SKILL_NAME);
     skillDest = join(skillDir, 'SKILL.md');
@@ -208,7 +208,7 @@ function registerCursorHook(osType) {
   if (!config.hooks) config.hooks = {};
   if (!config.hooks.stop) config.hooks.stop = [];
 
-  // 构建 hook 命令
+  // Build hook command
   let hookCmd;
   if (osType === 'unix') {
     hookCmd = `bash ${INSTALL_BASE}/hooks/stop/check_uncommitted.sh`;
@@ -216,12 +216,12 @@ function registerCursorHook(osType) {
     hookCmd = `powershell -File "${INSTALL_BASE}\\hooks\\stop\\check_uncommitted.ps1"`;
   }
 
-  // 检查是否已注册
+  // Check if already registered
   const alreadyRegistered = config.hooks.stop.some(
     h => typeof h === 'object' && h.command && h.command.includes(SKILL_NAME.replace(/-/g, ''))
   );
 
-  // 用更精确的检测：检查命令中是否包含 agent-better-checkpoint
+  // More precise check: command includes agent-better-checkpoint
   const registered = config.hooks.stop.some(
     h => typeof h === 'object' && h.command && h.command.includes('agent-better-checkpoint')
   );
@@ -265,7 +265,7 @@ function registerClaudeHook(osType) {
 }
 
 // ============================================================
-// 卸载逻辑
+// Uninstall logic
 // ============================================================
 
 function uninstallScripts() {
@@ -324,7 +324,7 @@ function unregisterClaudeHook() {
 }
 
 // ============================================================
-// 主入口
+// Main entry
 // ============================================================
 
 function main() {
@@ -341,7 +341,7 @@ function main() {
   }
 
   if (args.uninstall) {
-    // 卸载流程
+    // Uninstall flow
     console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Uninstalling...`);
 
     if (aiPlatform === 'cursor') {
@@ -355,7 +355,7 @@ function main() {
     uninstallScripts();
     console.log(`\n✅ Uninstallation complete!`);
   } else {
-    // 安装流程
+    // Install flow
     console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);
 
     installScripts(osType);
@@ -369,8 +369,8 @@ function main() {
 
     console.log(`\n✅ Installation complete!`);
     console.log(`\nInstalled components:`);
-    console.log(`  📜 Checkpoint script → ~/.agent-better-checkpoint/scripts/`);
-    console.log(`  🔒 Stop hook         → ~/.agent-better-checkpoint/hooks/stop/`);
+    console.log(`  📜 Checkpoint script → ~/.vibe-x/agent-better-checkpoint/scripts/`);
+    console.log(`  🔒 Stop hook         → ~/.vibe-x/agent-better-checkpoint/hooks/stop/`);
     console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/skills/'}${SKILL_NAME}/`);
     console.log(`\nThe AI agent will now auto-commit with semantic messages. Happy coding! 🎉`);
   }

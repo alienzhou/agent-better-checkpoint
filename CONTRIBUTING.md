@@ -66,8 +66,14 @@ echo '{"stop_hook_active":true}' | bash platform/unix/check_uncommitted.sh
 │   │   ├── checkpoint.sh               # Bash: checkpoint commit 脚本
 │   │   └── check_uncommitted.sh        # Bash: stop hook
 │   └── win/
-│       ├── checkpoint.ps1              # PowerShell: checkpoint commit 脚本
+│       ├── checkpoint.ps1               # PowerShell: checkpoint commit 脚本
 │       └── check_uncommitted.ps1       # PowerShell: stop hook
+├── .vibe-x/agent-better-checkpoint/    # 项目级（可随项目提交）
+│   ├── config.yml                      # 触发条件配置
+│   ├── checkpoint.sh                   # Unix checkpoint 脚本
+│   ├── check_uncommitted.sh            # Unix stop hook
+│   ├── checkpoint.ps1                  # Windows checkpoint 脚本
+│   └── check_uncommitted.ps1           # Windows stop hook
 ├── skill/
 │   └── SKILL.md                        # AI Agent 指令（含 YAML frontmatter）
 ├── LICENSE
@@ -172,8 +178,8 @@ mkdir /tmp/test-publish && cd /tmp/test-publish
 npx @vibe-x/agent-better-checkpoint --platform cursor
 
 # 检查安装产物
-ls -la ~/.agent-better-checkpoint/scripts/
-ls -la ~/.agent-better-checkpoint/hooks/stop/
+ls -la ~/.vibe-x/agent-better-checkpoint/scripts/
+ls -la ~/.vibe-x/agent-better-checkpoint/hooks/stop/
 cat ~/.cursor/hooks.json
 
 # 清理
@@ -219,7 +225,7 @@ npx skills add alienzhou/agent-better-checkpoint
 # 这会将 skill/SKILL.md 安装到 ~/.cursor/skills/agent-better-checkpoint/
 
 # 5. 验证自举流程
-# AI Agent 读到 SKILL.md 后，会检测 ~/.agent-better-checkpoint/scripts/ 不存在，
+# AI Agent 读到 SKILL.md 后，会检测 ~/.vibe-x/agent-better-checkpoint/scripts/ 不存在，
 # 然后自动执行 npx @vibe-x/agent-better-checkpoint@<version> 完成安装。
 ```
 
