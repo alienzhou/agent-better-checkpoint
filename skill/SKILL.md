@@ -3,7 +3,7 @@ name: agent-better-checkpoint
 description: "Automatically creates semantic Git checkpoint commits during AI coding sessions. Replaces opaque platform checkpoints with transparent, queryable Git commits using Conventional Commits format with Git Trailers. You MUST follow this skill whenever you make code changes — commit after each meaningful edit."
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.1.1"
   author: "alienzhou"
   category: "version-control"
 ---
@@ -26,7 +26,7 @@ Before your first commit, verify the checkpoint scripts are installed:
 If the scripts are **not** installed, run:
 
 ```bash
-npx @vibe-x/agent-better-checkpoint@0.1.0
+npx @vibe-x/agent-better-checkpoint@0.1.1
 ```
 
 This will install the checkpoint scripts and stop hook for your platform.
@@ -167,4 +167,4 @@ This should feel natural — commit as you go, like any good developer.
 
 ---
 
-**Version**: 0.1.0
+**Version**: 0.1.1
