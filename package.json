@@ -1,6 +1,6 @@
 {
   "name": "@vibe-x/agent-better-checkpoint",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Semantic Git checkpoint commits for AI coding sessions",
   "type": "module",
   "bin": {
