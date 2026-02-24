@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--target` is now project-only: installs skill, hooks, scripts only to the target directory (`.cursor/skills/`, `.cursor/hooks.json`, `.vibe-x/`), no global writes; use without `--target` for global install
 - Project-level hooks use `.cursor/hooks/` with relative path commands, following [Cursor project hooks](https://cursor.com/docs/agent/hooks) convention
 - Project-level skill installed to `.cursor/skills/` (or `.claude/skills/`), following [Cursor project skills](https://cursor.com/docs/context/skills) convention
-- Hook scripts installed for both OS (`.sh` + `.ps1`) in project mode for cross-platform portability
+- All scripts (checkpoint + stop hook) always install both `.sh` and `.ps1` regardless of current OS, for both global and project modes
 
 ### Fixed
 
