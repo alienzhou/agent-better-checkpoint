@@ -29,7 +29,7 @@ If neither exists, run:
 npx @vibe-x/agent-better-checkpoint@0.2.0
 ```
 
-This installs the global scripts and stop hook. Projects can also commit `.vibe-x/agent-better-checkpoint/` (config + scripts) for self-contained setup.
+This installs the global scripts and stop hook. For self-contained setup (commit with project), add `--project-local` or `--dir <path>`.
 
 ---
 

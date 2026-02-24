@@ -31,19 +31,30 @@ const SKILL_NAME = 'agent-better-checkpoint';
 // In-package source paths
 const PLATFORM_DIR = join(PKG_ROOT, 'platform');
 const SKILL_SRC = join(PKG_ROOT, 'skill', 'SKILL.md');
+const CONFIG_TEMPLATE = join(PLATFORM_DIR, 'config.template.yml');
 
 // ============================================================
 // Argument parsing
 // ============================================================
 
 function parseArgs(argv) {
-  const args = { platform: null, uninstall: false };
+  const args = { platform: null, uninstall: false, projectLocal: false, dir: null };
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
       case '--platform':
         args.platform = argv[++i];
         if (!['cursor', 'claude'].includes(args.platform)) {
           console.error(`Error: unsupported platform "${args.platform}". Use "cursor" or "claude".`);
+          process.exit(1);
+        }
+        break;
+      case '--project-local':
+        args.projectLocal = true;
+        break;
+      case '--dir':
+        args.dir = argv[++i];
+        if (!args.dir) {
+          console.error('Error: --dir requires a path argument');
           process.exit(1);
         }
         break;
@@ -73,6 +84,8 @@ Usage:
 
 Options:
   --platform <cursor|claude>  Target AI platform (auto-detected if omitted)
+  --project-local             Install to current project (.vibe-x/agent-better-checkpoint/)
+  --dir <path>                Install to specified project directory
   --uninstall                 Remove installed files and hook registrations
   -h, --help                  Show this help message
 `);
@@ -234,6 +247,37 @@ function registerCursorHook(osType) {
   console.log(`  Config  → ${hooksPath}`);
 }
 
+function installProjectLocal(targetDir, osType) {
+  const projectBase = join(resolve(targetDir), '.vibe-x', 'agent-better-checkpoint');
+  ensureDir(projectBase);
+
+  if (osType === 'unix') {
+    copyFileSafe(join(PLATFORM_DIR, 'unix', 'checkpoint.sh'), join(projectBase, 'checkpoint.sh'));
+    copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(projectBase, 'check_uncommitted.sh'));
+    setExecutable(join(projectBase, 'checkpoint.sh'));
+    setExecutable(join(projectBase, 'check_uncommitted.sh'));
+  }
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'checkpoint.ps1'), join(projectBase, 'checkpoint.ps1'));
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(projectBase, 'check_uncommitted.ps1'));
+
+  const configDest = join(projectBase, 'config.yml');
+  if (!existsSync(configDest) && existsSync(CONFIG_TEMPLATE)) {
+    copyFileSafe(CONFIG_TEMPLATE, configDest);
+  }
+
+  console.log(`  Project → ${projectBase}/`);
+}
+
+function uninstallProjectLocal(targetDir) {
+  const projectBase = join(resolve(targetDir), '.vibe-x', 'agent-better-checkpoint');
+  if (existsSync(projectBase)) {
+    rmSync(projectBase, { recursive: true, force: true });
+    console.log(`  Removed project-local: ${projectBase}`);
+  } else {
+    console.log(`  ${projectBase} not found, nothing to remove`);
+  }
+}
+
 function registerClaudeHook(osType) {
   const settingsPath = join(homedir(), '.claude', 'settings.json');
   let settings = readJsonFile(settingsPath) || {};
@@ -331,8 +375,9 @@ function main() {
   const args = parseArgs(process.argv);
   const osType = getOSType();
   const aiPlatform = args.platform || detectAIPlatform();
+  const projectTargetDir = args.dir || (args.projectLocal ? process.cwd() : null);
 
-  if (!aiPlatform) {
+  if (!aiPlatform && !projectTargetDir) {
     console.error(
       'Error: could not detect AI platform.\n' +
       'Please specify: npx @vibe-x/agent-better-checkpoint --platform cursor|claude'
@@ -341,38 +386,57 @@ function main() {
   }
 
   if (args.uninstall) {
-    // Uninstall flow
-    console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Uninstalling...`);
-
-    if (aiPlatform === 'cursor') {
-      uninstallCursorSkill();
-      unregisterCursorHook();
-    } else {
-      uninstallClaudeSkill();
-      unregisterClaudeHook();
+    if (projectTargetDir) {
+      console.log('\n[Project-local] Uninstalling...');
+      uninstallProjectLocal(projectTargetDir);
+    } else if (aiPlatform) {
+      console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Uninstalling...`);
+      if (aiPlatform === 'cursor') {
+        uninstallCursorSkill();
+        unregisterCursorHook();
+      } else {
+        uninstallClaudeSkill();
+        unregisterClaudeHook();
+      }
+      uninstallScripts();
     }
-
-    uninstallScripts();
-    console.log(`\n✅ Uninstallation complete!`);
+    console.log('\n✅ Uninstallation complete!');
   } else {
-    // Install flow
-    console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);
-
-    installScripts(osType);
-    installSkill(aiPlatform);
-
-    if (aiPlatform === 'cursor') {
-      registerCursorHook(osType);
+    if (projectTargetDir) {
+      if (!aiPlatform) {
+        console.error('Error: --project-local/--dir requires AI platform for global hook. Specify --platform cursor|claude');
+        process.exit(1);
+      }
+      console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);
+      installScripts(osType);
+      installSkill(aiPlatform);
+      if (aiPlatform === 'cursor') {
+        registerCursorHook(osType);
+      } else {
+        registerClaudeHook(osType);
+      }
+      installProjectLocal(projectTargetDir, osType);
     } else {
-      registerClaudeHook(osType);
+      console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);
+      installScripts(osType);
+      installSkill(aiPlatform);
+      if (aiPlatform === 'cursor') {
+        registerCursorHook(osType);
+      } else {
+        registerClaudeHook(osType);
+      }
     }
 
-    console.log(`\n✅ Installation complete!`);
-    console.log(`\nInstalled components:`);
+    console.log('\n✅ Installation complete!');
+    console.log('\nInstalled components:');
     console.log(`  📜 Checkpoint script → ~/.vibe-x/agent-better-checkpoint/scripts/`);
     console.log(`  🔒 Stop hook         → ~/.vibe-x/agent-better-checkpoint/hooks/stop/`);
     console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/skills/'}${SKILL_NAME}/`);
-    console.log(`\nThe AI agent will now auto-commit with semantic messages. Happy coding! 🎉`);
+    if (projectTargetDir) {
+      const projectBase = join(resolve(projectTargetDir), '.vibe-x', 'agent-better-checkpoint');
+      console.log(`  📁 Project-local     → ${projectBase}/`);
+    }
+    console.log('\nThe AI agent will now auto-commit with semantic messages. Happy coding! 🎉');
   }
 }
 

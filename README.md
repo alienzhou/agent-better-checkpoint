@@ -96,6 +96,28 @@ npx @vibe-x/agent-better-checkpoint --platform cursor
 npx @vibe-x/agent-better-checkpoint --platform claude
 ```
 
+### Project-local Install
+
+Install scripts into your project for self-contained setup (commit with repo):
+
+```bash
+cd /path/to/your/project
+npx @vibe-x/agent-better-checkpoint --project-local
+```
+
+Or specify a target directory:
+
+```bash
+npx @vibe-x/agent-better-checkpoint --dir /path/to/your/project
+```
+
+Uninstall project-local only:
+
+```bash
+npx @vibe-x/agent-better-checkpoint --uninstall --project-local
+npx @vibe-x/agent-better-checkpoint --uninstall --dir /path/to/project
+```
+
 ### Via [skills.sh](https://skills.sh)
 
 ```bash

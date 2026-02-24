@@ -96,6 +96,28 @@ npx @vibe-x/agent-better-checkpoint --platform cursor
 npx @vibe-x/agent-better-checkpoint --platform claude
 ```
 
+### 项目级安装
+
+将脚本安装到项目目录，便于随仓库提交、实现自包含：
+
+```bash
+cd /path/to/your/project
+npx @vibe-x/agent-better-checkpoint --project-local
+```
+
+或指定目标目录：
+
+```bash
+npx @vibe-x/agent-better-checkpoint --dir /path/to/your/project
+```
+
+仅卸载项目级安装：
+
+```bash
+npx @vibe-x/agent-better-checkpoint --uninstall --project-local
+npx @vibe-x/agent-better-checkpoint --uninstall --dir /path/to/project
+```
+
 ### 通过 [skills.sh](https://skills.sh) 安装
 
 ```bash
