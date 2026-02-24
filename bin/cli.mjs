@@ -153,31 +153,17 @@ function installScripts(osType) {
   ensureDir(scriptsDir);
   ensureDir(hooksDir);
 
-  if (osType === 'unix') {
-    const checkpointSrc = join(PLATFORM_DIR, 'unix', 'checkpoint.sh');
-    const hookSrc = join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh');
-    const checkpointDest = join(scriptsDir, 'checkpoint.sh');
-    const hookDest = join(hooksDir, 'check_uncommitted.sh');
+  // 双端脚本都安装，方便跨平台使用
+  copyFileSafe(join(PLATFORM_DIR, 'unix', 'checkpoint.sh'), join(scriptsDir, 'checkpoint.sh'));
+  copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(hooksDir, 'check_uncommitted.sh'));
+  setExecutable(join(scriptsDir, 'checkpoint.sh'));
+  setExecutable(join(hooksDir, 'check_uncommitted.sh'));
 
-    copyFileSafe(checkpointSrc, checkpointDest);
-    copyFileSafe(hookSrc, hookDest);
-    setExecutable(checkpointDest);
-    setExecutable(hookDest);
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'checkpoint.ps1'), join(scriptsDir, 'checkpoint.ps1'));
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(hooksDir, 'check_uncommitted.ps1'));
 
-    console.log(`  Scripts → ${scriptsDir}/checkpoint.sh`);
-    console.log(`  Hooks   → ${hooksDir}/check_uncommitted.sh`);
-  } else {
-    const checkpointSrc = join(PLATFORM_DIR, 'win', 'checkpoint.ps1');
-    const hookSrc = join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1');
-    const checkpointDest = join(scriptsDir, 'checkpoint.ps1');
-    const hookDest = join(hooksDir, 'check_uncommitted.ps1');
-
-    copyFileSafe(checkpointSrc, checkpointDest);
-    copyFileSafe(hookSrc, hookDest);
-
-    console.log(`  Scripts → ${scriptsDir}\\checkpoint.ps1`);
-    console.log(`  Hooks   → ${hooksDir}\\check_uncommitted.ps1`);
-  }
+  console.log(`  Scripts → ${scriptsDir}/`);
+  console.log(`  Hooks   → ${hooksDir}/`);
 }
 
 function installSkill(aiPlatform) {
@@ -510,8 +496,8 @@ function main() {
       }
       console.log('\n✅ Installation complete!');
       console.log('\nInstalled components:');
-      console.log(`  📜 Checkpoint script → ~/.vibe-x/agent-better-checkpoint/scripts/`);
-      console.log(`  🔒 Stop hook         → ~/.vibe-x/agent-better-checkpoint/hooks/stop/`);
+      console.log(`  📜 Checkpoint script → ~/.vibe-x/agent-better-checkpoint/scripts/ (.sh + .ps1)`);
+      console.log(`  🔒 Stop hook         → ~/.vibe-x/agent-better-checkpoint/hooks/stop/ (.sh + .ps1)`);
       console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/skills/'}${SKILL_NAME}/`);
     }
     console.log('\nThe AI agent will now auto-commit with semantic messages. Happy coding! 🎉');

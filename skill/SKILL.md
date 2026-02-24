@@ -20,8 +20,10 @@ You are an AI coding assistant with **checkpoint awareness**. Every meaningful e
 
 Before your first commit, verify the checkpoint scripts are available:
 
-**Project-local (preferred, committed with project):** Check if `.vibe-x/agent-better-checkpoint/checkpoint.sh` exists in the workspace.
-**Global fallback:** Check if `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` exists (macOS/Linux) or `$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1` (Windows).
+**Project-local (preferred):** Check if `.vibe-x/agent-better-checkpoint/checkpoint.sh` (or `.ps1`) exists in the workspace.
+**Global fallback:** Check if `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` (or `.ps1`) exists.
+
+Both `.sh` and `.ps1` are always installed regardless of current OS.
 
 If neither exists, run:
 
@@ -94,29 +96,14 @@ Switch to flex-column layout with collapsible sidebar.
 
 ## 🛠️ How to Commit
 
-Call the checkpoint script after composing your message. Determine the OS and use the appropriate command.
+Call the checkpoint script after composing your message. Both `.sh` and `.ps1` are always available — pick the one matching the current OS.
 
-**Prefer project-local when present** (`.vibe-x/agent-better-checkpoint/` committed with project):
+**Prefer project-local when present**, fall back to global:
 
-**macOS/Linux:**
-
-```bash
-# Project-local (if .vibe-x/agent-better-checkpoint/ exists)
-.vibe-x/agent-better-checkpoint/checkpoint.sh "<commit-message>" "<user-prompt>"
-
-# Or global fallback
-~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh "<commit-message>" "<user-prompt>"
-```
-
-**Windows (PowerShell):**
-
-```powershell
-# Project-local (if .vibe-x/agent-better-checkpoint/ exists)
-powershell -File ".\.vibe-x\agent-better-checkpoint\checkpoint.ps1" "<commit-message>" "<user-prompt>"
-
-# Or global fallback
-powershell -File "$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1" "<commit-message>" "<user-prompt>"
-```
+| OS | Project-local | Global fallback |
+|----|--------------|-----------------|
+| macOS/Linux | `.vibe-x/agent-better-checkpoint/checkpoint.sh` | `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` |
+| Windows | `powershell -File ".vibe-x\agent-better-checkpoint\checkpoint.ps1"` | `powershell -File "$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\checkpoint.ps1"` |
 
 ### Parameters:
 
@@ -129,7 +116,7 @@ powershell -File "$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/check
 ### Example (macOS/Linux):
 
 ```bash
-~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh \
+.vibe-x/agent-better-checkpoint/checkpoint.sh \
   "checkpoint(auth): add JWT token refresh logic
 
 Implement automatic token refresh when access token expires.
@@ -140,7 +127,7 @@ Uses refresh token rotation for security." \
 ### Example (Windows):
 
 ```powershell
-powershell -File "$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1" `
+powershell -File ".vibe-x\agent-better-checkpoint\checkpoint.ps1" `
   "checkpoint(auth): add JWT token refresh logic`n`nImplement automatic token refresh when access token expires.`nUses refresh token rotation for security." `
   "帮我实现 token 刷新机制"
 ```
