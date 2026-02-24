@@ -38,7 +38,7 @@ const CONFIG_TEMPLATE = join(PLATFORM_DIR, 'config.template.yml');
 // ============================================================
 
 function parseArgs(argv) {
-  const args = { platform: null, uninstall: false, projectLocal: false, dir: null };
+  const args = { platform: null, uninstall: false, target: null };
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
       case '--platform':
@@ -48,13 +48,10 @@ function parseArgs(argv) {
           process.exit(1);
         }
         break;
-      case '--project-local':
-        args.projectLocal = true;
-        break;
-      case '--dir':
-        args.dir = argv[++i];
-        if (!args.dir) {
-          console.error('Error: --dir requires a path argument');
+      case '--target':
+        args.target = argv[++i];
+        if (!args.target) {
+          console.error('Error: --target requires a path argument');
           process.exit(1);
         }
         break;
@@ -84,8 +81,7 @@ Usage:
 
 Options:
   --platform <cursor|claude>  Target AI platform (auto-detected if omitted)
-  --project-local             Install to current project (.vibe-x/agent-better-checkpoint/)
-  --dir <path>                Install to specified project directory
+  --target <path>             Install to specified project directory (. for cwd)
   --uninstall                 Remove installed files and hook registrations
   -h, --help                  Show this help message
 `);
@@ -375,7 +371,7 @@ function main() {
   const args = parseArgs(process.argv);
   const osType = getOSType();
   const aiPlatform = args.platform || detectAIPlatform();
-  const projectTargetDir = args.dir || (args.projectLocal ? process.cwd() : null);
+  const projectTargetDir = args.target ? resolve(args.target) : null;
 
   if (!aiPlatform && !projectTargetDir) {
     console.error(
@@ -402,9 +398,9 @@ function main() {
     }
     console.log('\n✅ Uninstallation complete!');
   } else {
-    if (projectTargetDir) {
-      if (!aiPlatform) {
-        console.error('Error: --project-local/--dir requires AI platform for global hook. Specify --platform cursor|claude');
+if (projectTargetDir) {
+        if (!aiPlatform) {
+        console.error('Error: --target requires AI platform for global hook. Specify --platform cursor|claude');
         process.exit(1);
       }
       console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);

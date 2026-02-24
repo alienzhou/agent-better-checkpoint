@@ -102,20 +102,20 @@ npx @vibe-x/agent-better-checkpoint --platform claude
 
 ```bash
 cd /path/to/your/project
-npx @vibe-x/agent-better-checkpoint --project-local
+npx @vibe-x/agent-better-checkpoint --target .
 ```
 
 或指定目标目录：
 
 ```bash
-npx @vibe-x/agent-better-checkpoint --dir /path/to/your/project
+npx @vibe-x/agent-better-checkpoint --target /path/to/your/project
 ```
 
 仅卸载项目级安装：
 
 ```bash
-npx @vibe-x/agent-better-checkpoint --uninstall --project-local
-npx @vibe-x/agent-better-checkpoint --uninstall --dir /path/to/project
+npx @vibe-x/agent-better-checkpoint --uninstall --target .
+npx @vibe-x/agent-better-checkpoint --uninstall --target /path/to/project
 ```
 
 ### 通过 [skills.sh](https://skills.sh) 安装
