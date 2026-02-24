@@ -186,16 +186,15 @@ function installSkill(aiPlatform) {
     skillDir = join(homedir(), '.cursor', 'skills', SKILL_NAME);
     skillDest = join(skillDir, 'SKILL.md');
   } else if (aiPlatform === 'claude') {
-    // Claude Code: 作为 slash command 安装
-    const commandsDir = join(homedir(), '.claude', 'commands');
-    skillDest = join(commandsDir, `${SKILL_NAME}.md`);
+    // Claude Code: 按标准 skills 目录安装
+    const skillsRootDir = join(homedir(), '.claude', 'skills');
+    skillDir = join(skillsRootDir, SKILL_NAME);
+    skillDest = join(skillDir, 'SKILL.md');
 
     if (existsSync(skillDest)) {
       console.log(`  Skill   → already installed at ${skillDest} (skipped)`);
       return;
     }
-
-    skillDir = commandsDir;
   }
 
   copyFileSafe(SKILL_SRC, skillDest);
@@ -287,10 +286,10 @@ function uninstallCursorSkill() {
 }
 
 function uninstallClaudeSkill() {
-  const cmdFile = join(homedir(), '.claude', 'commands', `${SKILL_NAME}.md`);
-  if (existsSync(cmdFile)) {
-    rmSync(cmdFile, { force: true });
-    console.log(`  Removed command: ${cmdFile}`);
+  const skillDir = join(homedir(), '.claude', 'skills', SKILL_NAME);
+  if (existsSync(skillDir)) {
+    rmSync(skillDir, { recursive: true, force: true });
+    console.log(`  Removed skill: ${skillDir}`);
   }
 }
 
@@ -372,7 +371,7 @@ function main() {
     console.log(`\nInstalled components:`);
     console.log(`  📜 Checkpoint script → ~/.agent-better-checkpoint/scripts/`);
     console.log(`  🔒 Stop hook         → ~/.agent-better-checkpoint/hooks/stop/`);
-    console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/commands/'}${SKILL_NAME}/`);
+    console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/skills/'}${SKILL_NAME}/`);
     console.log(`\nThe AI agent will now auto-commit with semantic messages. Happy coding! 🎉`);
   }
 }
