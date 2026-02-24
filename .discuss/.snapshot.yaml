@@ -1,0 +1,12 @@
+version: 1
+config:
+  stale_threshold: 3
+discussions:
+  2026-02-24/checkpoint-exclude-filter:
+    outline:
+      mtime: 1771935068.4020252
+      change_count: 0
+    decisions:
+    - name: D01-trigger-control-model.md
+      mtime: 1771935082.124692
+    notes: []
