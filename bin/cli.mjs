@@ -308,6 +308,12 @@ function registerClaudeHook(osType) {
 // Uninstall logic
 // ============================================================
 
+function hasInstallation(platform) {
+  const home = homedir();
+  const skillDir = join(home, platform === 'cursor' ? '.cursor' : '.claude', 'skills', SKILL_NAME);
+  return existsSync(skillDir);
+}
+
 function uninstallScripts() {
   if (existsSync(INSTALL_BASE)) {
     rmSync(INSTALL_BASE, { recursive: true, force: true });
@@ -373,7 +379,7 @@ function main() {
   const aiPlatform = args.platform || detectAIPlatform();
   const projectTargetDir = args.target ? resolve(args.target) : null;
 
-  if (!aiPlatform && !projectTargetDir) {
+  if (!aiPlatform && !projectTargetDir && !args.uninstall) {
     console.error(
       'Error: could not detect AI platform.\n' +
       'Please specify: npx @vibe-x/agent-better-checkpoint --platform cursor|claude'
@@ -385,16 +391,31 @@ function main() {
     if (projectTargetDir) {
       console.log('\n[Project-local] Uninstalling...');
       uninstallProjectLocal(projectTargetDir);
-    } else if (aiPlatform) {
-      console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Uninstalling...`);
-      if (aiPlatform === 'cursor') {
-        uninstallCursorSkill();
-        unregisterCursorHook();
-      } else {
-        uninstallClaudeSkill();
-        unregisterClaudeHook();
+    }
+
+    // 指定 --platform 时只清该平台；未指定时清理所有已安装的平台
+    const platforms = args.platform
+      ? [args.platform]
+      : ['cursor', 'claude'].filter(p => hasInstallation(p));
+
+    if (!projectTargetDir || args.platform) {
+      for (const p of platforms) {
+        console.log(`\n[${p === 'cursor' ? 'Cursor' : 'Claude Code'}] Uninstalling...`);
+        if (p === 'cursor') {
+          uninstallCursorSkill();
+          unregisterCursorHook();
+        } else {
+          uninstallClaudeSkill();
+          unregisterClaudeHook();
+        }
       }
-      uninstallScripts();
+      if (platforms.length > 0) {
+        uninstallScripts();
+      }
+    }
+
+    if (platforms.length === 0 && !projectTargetDir) {
+      console.log('\nNo installation found for any platform.');
     }
     console.log('\n✅ Uninstallation complete!');
   } else {
