@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/zhouhongxuan/program/works/vibe-x-ai/agent-better-checkpoint/.claude/hooks/stop/check_precipitation.py"
+          }
+        ]
+      }
+    ]
+  }
+}
