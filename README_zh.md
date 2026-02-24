@@ -98,24 +98,19 @@ npx @vibe-x/agent-better-checkpoint --platform claude
 
 ### 项目级安装
 
-将脚本安装到项目目录，便于随仓库提交、实现自包含：
+仅安装到项目目录（不修改全局）。使用 Cursor 的 [项目级 skills](https://cursor.com/docs/context/skills) 和 [hooks](https://cursor.com/docs/agent/hooks)：
 
 ```bash
 cd /path/to/your/project
-npx @vibe-x/agent-better-checkpoint --target .
+npx @vibe-x/agent-better-checkpoint --platform cursor --target .
 ```
 
-或指定目标目录：
-
-```bash
-npx @vibe-x/agent-better-checkpoint --target /path/to/your/project
-```
+会创建：`.cursor/skills/`、`.cursor/hooks.json`、`.vibe-x/agent-better-checkpoint/`。可随仓库提交。
 
 仅卸载项目级安装：
 
 ```bash
 npx @vibe-x/agent-better-checkpoint --uninstall --target .
-npx @vibe-x/agent-better-checkpoint --uninstall --target /path/to/project
 ```
 
 ### 通过 [skills.sh](https://skills.sh) 安装
@@ -128,14 +123,23 @@ AI Agent 会在首次使用时自动引导安装运行时脚本。
 
 ### 安装内容
 
+**全局**（无 `--target`）：
+
 | 位置 | 内容 |
 |------|------|
 | `~/.vibe-x/agent-better-checkpoint/scripts/` | Commit 脚本（`checkpoint.sh` / `.ps1`） |
 | `~/.vibe-x/agent-better-checkpoint/hooks/stop/` | Stop hook（`check_uncommitted.sh` / `.ps1`） |
-| 平台 skill 目录 | `SKILL.md` — AI Agent 指令 |
-| 平台 hook 配置 | Stop hook 注册 |
+| `~/.cursor/skills/` 或 `~/.claude/skills/` | `SKILL.md` — AI Agent 指令 |
+| `~/.cursor/hooks.json` 或 `~/.claude/settings.json` | Stop hook 注册 |
 
-> **项目级模式**：项目可将 `.vibe-x/agent-better-checkpoint/`（配置 + 脚本）提交到仓库实现自包含。存在时，全局 hook 会自动委托给项目级脚本。
+**项目级**（`--target .`）：
+
+| 位置 | 内容 |
+|------|------|
+| `<project>/.cursor/skills/agent-better-checkpoint/` | `SKILL.md` |
+| `<project>/.cursor/hooks.json` | Stop hook（仅 Cursor） |
+| `<project>/.cursor/hooks/` | `check_uncommitted.sh` |
+| `<project>/.vibe-x/agent-better-checkpoint/` | `checkpoint.sh`、`config.yml` |
 
 ### 卸载
 

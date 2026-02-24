@@ -96,26 +96,21 @@ npx @vibe-x/agent-better-checkpoint --platform cursor
 npx @vibe-x/agent-better-checkpoint --platform claude
 ```
 
-### Project-local Install
+### Project-only Install
 
-Install scripts into your project for self-contained setup (commit with repo):
+Install only into your project (no global changes). Uses Cursor's project-level [skills](https://cursor.com/docs/context/skills) and [hooks](https://cursor.com/docs/agent/hooks):
 
 ```bash
 cd /path/to/your/project
-npx @vibe-x/agent-better-checkpoint --target .
+npx @vibe-x/agent-better-checkpoint --platform cursor --target .
 ```
 
-Or specify a target directory:
+Creates: `.cursor/skills/`, `.cursor/hooks.json`, `.vibe-x/agent-better-checkpoint/`. Commit these with your repo.
 
-```bash
-npx @vibe-x/agent-better-checkpoint --target /path/to/your/project
-```
-
-Uninstall project-local only:
+Uninstall project-only:
 
 ```bash
 npx @vibe-x/agent-better-checkpoint --uninstall --target .
-npx @vibe-x/agent-better-checkpoint --uninstall --target /path/to/project
 ```
 
 ### Via [skills.sh](https://skills.sh)
@@ -128,14 +123,23 @@ The AI agent will auto-bootstrap the runtime scripts on first use.
 
 ### What Gets Installed
 
+**Global** (no `--target`):
+
 | Location | Content |
 |----------|---------|
 | `~/.vibe-x/agent-better-checkpoint/scripts/` | Commit script (`checkpoint.sh` / `.ps1`) |
 | `~/.vibe-x/agent-better-checkpoint/hooks/stop/` | Stop hook (`check_uncommitted.sh` / `.ps1`) |
-| Platform skill directory | `SKILL.md` — AI agent instructions |
-| Platform hook config | Stop hook registration |
+| `~/.cursor/skills/` or `~/.claude/skills/` | `SKILL.md` — AI agent instructions |
+| `~/.cursor/hooks.json` or `~/.claude/settings.json` | Stop hook registration |
 
-> **Project-local mode**: Projects can also commit `.vibe-x/agent-better-checkpoint/` (config + scripts) for self-contained setup. When present, the global hook delegates to the project-local scripts automatically.
+**Project-only** (`--target .`):
+
+| Location | Content |
+|----------|---------|
+| `<project>/.cursor/skills/agent-better-checkpoint/` | `SKILL.md` |
+| `<project>/.cursor/hooks.json` | Stop hook (Cursor only) |
+| `<project>/.cursor/hooks/` | `check_uncommitted.sh` |
+| `<project>/.vibe-x/agent-better-checkpoint/` | `checkpoint.sh`, `config.yml` |
 
 ### Uninstall
 

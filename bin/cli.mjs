@@ -12,7 +12,7 @@
  *   npx @vibe-x/agent-better-checkpoint --uninstall
  */
 
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, chmodSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, chmodSync, rmSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { homedir, platform } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -81,7 +81,7 @@ Usage:
 
 Options:
   --platform <cursor|claude>  Target AI platform (auto-detected if omitted)
-  --target <path>             Install to specified project directory (. for cwd)
+  --target <path>             Project-only install (no global). Use . for cwd
   --uninstall                 Remove installed files and hook registrations
   -h, --help                  Show this help message
 `);
@@ -243,34 +243,111 @@ function registerCursorHook(osType) {
   console.log(`  Config  → ${hooksPath}`);
 }
 
-function installProjectLocal(targetDir, osType) {
-  const projectBase = join(resolve(targetDir), '.vibe-x', 'agent-better-checkpoint');
-  ensureDir(projectBase);
+// 项目级安装：仅写入 target 目录，不触碰全局
+function installProjectOnly(targetDir, aiPlatform, osType) {
+  const root = resolve(targetDir);
 
-  if (osType === 'unix') {
-    copyFileSafe(join(PLATFORM_DIR, 'unix', 'checkpoint.sh'), join(projectBase, 'checkpoint.sh'));
-    copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(projectBase, 'check_uncommitted.sh'));
-    setExecutable(join(projectBase, 'checkpoint.sh'));
-    setExecutable(join(projectBase, 'check_uncommitted.sh'));
-  }
-  copyFileSafe(join(PLATFORM_DIR, 'win', 'checkpoint.ps1'), join(projectBase, 'checkpoint.ps1'));
-  copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(projectBase, 'check_uncommitted.ps1'));
-
-  const configDest = join(projectBase, 'config.yml');
+  // .vibe-x/agent-better-checkpoint: checkpoint 脚本 + config
+  const vibeXBase = join(root, '.vibe-x', 'agent-better-checkpoint');
+  ensureDir(vibeXBase);
+  copyFileSafe(join(PLATFORM_DIR, 'unix', 'checkpoint.sh'), join(vibeXBase, 'checkpoint.sh'));
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'checkpoint.ps1'), join(vibeXBase, 'checkpoint.ps1'));
+  setExecutable(join(vibeXBase, 'checkpoint.sh'));
+  const configDest = join(vibeXBase, 'config.yml');
   if (!existsSync(configDest) && existsSync(CONFIG_TEMPLATE)) {
     copyFileSafe(CONFIG_TEMPLATE, configDest);
   }
+  console.log(`  Config  → ${vibeXBase}/`);
 
-  console.log(`  Project → ${projectBase}/`);
+  // Skill: .cursor/skills/ 或 .claude/skills/
+  const skillRoot = aiPlatform === 'cursor' ? '.cursor' : '.claude';
+  const skillDir = join(root, skillRoot, 'skills', SKILL_NAME);
+  copyFileSafe(SKILL_SRC, join(skillDir, 'SKILL.md'));
+  console.log(`  Skill   → ${skillDir}/`);
+
+  if (aiPlatform === 'cursor') {
+    // Cursor 支持项目级 hooks: .cursor/hooks.json + .cursor/hooks/
+    const hooksDir = join(root, '.cursor', 'hooks');
+    ensureDir(hooksDir);
+    if (osType === 'unix') {
+      copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(hooksDir, 'check_uncommitted.sh'));
+      setExecutable(join(hooksDir, 'check_uncommitted.sh'));
+    } else {
+      copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(hooksDir, 'check_uncommitted.ps1'));
+    }
+    const hookCmd = osType === 'unix'
+      ? 'bash .cursor/hooks/check_uncommitted.sh'
+      : `powershell -File ".cursor/hooks/check_uncommitted.ps1"`;
+    const hooksPath = join(root, '.cursor', 'hooks.json');
+    let config = readJsonFile(hooksPath) || { version: 1, hooks: {} };
+    if (!config.hooks) config.hooks = {};
+    if (!config.hooks.stop) config.hooks.stop = [];
+    const registered = config.hooks.stop.some(
+      h => typeof h === 'object' && h.command && h.command.includes('check_uncommitted')
+    );
+    if (!registered) {
+      config.hooks.stop.push({ command: hookCmd });
+    }
+    writeJsonFile(hooksPath, config);
+    console.log(`  Hooks   → ${hooksPath}`);
+  } else {
+    // Claude Code: settings.json 为全局，无项目级 hooks，仅安装 skill 和脚本
+    console.log(`  Hooks   → (Claude stop hook is global-only, skipped for project install)`);
+  }
 }
 
-function uninstallProjectLocal(targetDir) {
-  const projectBase = join(resolve(targetDir), '.vibe-x', 'agent-better-checkpoint');
-  if (existsSync(projectBase)) {
-    rmSync(projectBase, { recursive: true, force: true });
-    console.log(`  Removed project-local: ${projectBase}`);
-  } else {
-    console.log(`  ${projectBase} not found, nothing to remove`);
+function uninstallProjectOnly(targetDir, aiPlatform) {
+  const root = resolve(targetDir);
+
+  const vibeXBase = join(root, '.vibe-x', 'agent-better-checkpoint');
+  const skillRoot = aiPlatform === 'cursor' ? '.cursor' : '.claude';
+  const skillDir = join(root, skillRoot, 'skills', SKILL_NAME);
+  if (existsSync(vibeXBase)) {
+    rmSync(vibeXBase, { recursive: true, force: true });
+    console.log(`  Removed ${vibeXBase}`);
+  }
+
+  if (existsSync(skillDir)) {
+    rmSync(skillDir, { recursive: true, force: true });
+    console.log(`  Removed ${skillDir}`);
+  }
+  // 移除空的 .cursor/skills 或 .claude/skills 父目录
+  const skillsParent = join(root, skillRoot, 'skills');
+  if (existsSync(skillsParent)) {
+    try {
+      if (readdirSync(skillsParent).length === 0) {
+        rmSync(skillsParent, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  if (aiPlatform === 'cursor') {
+    const hooksPath = join(root, '.cursor', 'hooks.json');
+    if (existsSync(hooksPath)) {
+      const config = readJsonFile(hooksPath);
+      if (config?.hooks?.stop) {
+        config.hooks.stop = config.hooks.stop.filter(
+          h => !(typeof h === 'object' && h.command && h.command.includes('check_uncommitted'))
+        );
+        if (config.hooks.stop.length === 0) delete config.hooks.stop;
+        if (Object.keys(config.hooks || {}).length === 0) {
+          rmSync(hooksPath, { force: true });
+        } else {
+          writeJsonFile(hooksPath, config);
+        }
+        console.log(`  Cleaned ${hooksPath}`);
+      }
+    }
+    const hooksDir = join(root, '.cursor', 'hooks');
+    const shPath = join(hooksDir, 'check_uncommitted.sh');
+    const ps1Path = join(hooksDir, 'check_uncommitted.ps1');
+    if (existsSync(shPath)) rmSync(shPath, { force: true });
+    if (existsSync(ps1Path)) rmSync(ps1Path, { force: true });
+    if (existsSync(hooksDir) && readdirSync(hooksDir).length === 0) {
+      rmSync(hooksDir, { recursive: true, force: true });
+    }
   }
 }
 
@@ -389,16 +466,25 @@ function main() {
 
   if (args.uninstall) {
     if (projectTargetDir) {
-      console.log('\n[Project-local] Uninstalling...');
-      uninstallProjectLocal(projectTargetDir);
-    }
-
-    // 指定 --platform 时只清该平台；未指定时清理所有已安装的平台
-    const platforms = args.platform
-      ? [args.platform]
-      : ['cursor', 'claude'].filter(p => hasInstallation(p));
-
-    if (!projectTargetDir || args.platform) {
+      // 优先从项目目录检测平台（与安装时一致），否则用 --platform 或全局检测
+      let platform = args.platform;
+      if (!platform) {
+        const cursorSkill = join(resolve(projectTargetDir), '.cursor', 'skills', SKILL_NAME);
+        const claudeSkill = join(resolve(projectTargetDir), '.claude', 'skills', SKILL_NAME);
+        if (existsSync(cursorSkill)) platform = 'cursor';
+        else if (existsSync(claudeSkill)) platform = 'claude';
+      }
+      if (!platform) platform = aiPlatform;
+      if (!platform) {
+        console.error('Error: --target uninstall requires --platform cursor|claude (or project must have skill installed)');
+        process.exit(1);
+      }
+      console.log(`\n[Project-local] Uninstalling from ${projectTargetDir}...`);
+      uninstallProjectOnly(projectTargetDir, platform);
+    } else {
+      const platforms = args.platform
+        ? [args.platform]
+        : ['cursor', 'claude'].filter(p => hasInstallation(p));
       for (const p of platforms) {
         console.log(`\n[${p === 'cursor' ? 'Cursor' : 'Claude Code'}] Uninstalling...`);
         if (p === 'cursor') {
@@ -409,30 +495,19 @@ function main() {
           unregisterClaudeHook();
         }
       }
-      if (platforms.length > 0) {
-        uninstallScripts();
-      }
-    }
-
-    if (platforms.length === 0 && !projectTargetDir) {
-      console.log('\nNo installation found for any platform.');
+      if (platforms.length > 0) uninstallScripts();
+      if (platforms.length === 0) console.log('\nNo global installation found.');
     }
     console.log('\n✅ Uninstallation complete!');
   } else {
-if (projectTargetDir) {
-        if (!aiPlatform) {
-        console.error('Error: --target requires AI platform for global hook. Specify --platform cursor|claude');
+    if (projectTargetDir) {
+      if (!aiPlatform) {
+        console.error('Error: --target requires --platform cursor|claude');
         process.exit(1);
       }
-      console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);
-      installScripts(osType);
-      installSkill(aiPlatform);
-      if (aiPlatform === 'cursor') {
-        registerCursorHook(osType);
-      } else {
-        registerClaudeHook(osType);
-      }
-      installProjectLocal(projectTargetDir, osType);
+      console.log(`\n[Project-local] Installing to ${projectTargetDir}... (OS: ${osType})`);
+      installProjectOnly(projectTargetDir, aiPlatform, osType);
+      console.log('\n✅ Installation complete! (project-only, no global changes)');
     } else {
       console.log(`\n[${aiPlatform === 'cursor' ? 'Cursor' : 'Claude Code'}] Installing... (OS: ${osType})`);
       installScripts(osType);
@@ -442,16 +517,11 @@ if (projectTargetDir) {
       } else {
         registerClaudeHook(osType);
       }
-    }
-
-    console.log('\n✅ Installation complete!');
-    console.log('\nInstalled components:');
-    console.log(`  📜 Checkpoint script → ~/.vibe-x/agent-better-checkpoint/scripts/`);
-    console.log(`  🔒 Stop hook         → ~/.vibe-x/agent-better-checkpoint/hooks/stop/`);
-    console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/skills/'}${SKILL_NAME}/`);
-    if (projectTargetDir) {
-      const projectBase = join(resolve(projectTargetDir), '.vibe-x', 'agent-better-checkpoint');
-      console.log(`  📁 Project-local     → ${projectBase}/`);
+      console.log('\n✅ Installation complete!');
+      console.log('\nInstalled components:');
+      console.log(`  📜 Checkpoint script → ~/.vibe-x/agent-better-checkpoint/scripts/`);
+      console.log(`  🔒 Stop hook         → ~/.vibe-x/agent-better-checkpoint/hooks/stop/`);
+      console.log(`  📖 SKILL.md          → ${aiPlatform === 'cursor' ? '~/.cursor/skills/' : '~/.claude/skills/'}${SKILL_NAME}/`);
     }
     console.log('\nThe AI agent will now auto-commit with semantic messages. Happy coding! 🎉');
   }
