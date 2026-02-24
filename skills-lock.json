@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-better-checkpoint": {
+      "source": "alienzhou/agent-better-checkpoint",
+      "sourceType": "github",
+      "computedHash": "24d77d3d99c4e6caa5f75010e9870f55878c0180e79ad10289e79cc496858efb"
+    }
+  }
+}
