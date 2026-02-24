@@ -18,18 +18,21 @@ You are an AI coding assistant with **checkpoint awareness**. Every meaningful e
 
 ## 🔧 Installation Check
 
-Before your first commit, verify the checkpoint scripts are available:
+Before your first commit, verify the checkpoint scripts are available.
 
-**Project-local (preferred, committed with project):** Check if `.vibe-x/agent-better-checkpoint/checkpoint.sh` exists in the workspace.
-**Global fallback:** Check if `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` exists (macOS/Linux) or `$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1` (Windows).
+**IMPORTANT: Use your file-listing/read tools (NOT shell `test -f`) to check existence.** Shell relative paths break when CWD ≠ workspace root.
+
+Check in order (stop at first hit):
+1. **Project-local (preferred):** `.vibe-x/agent-better-checkpoint/checkpoint.sh` (or `.ps1`) relative to workspace root.
+2. **Global fallback:** `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` (or `.ps1`) (macOS/Linux) or `$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\checkpoint.ps1` (Windows).
 
 If neither exists, run:
 
 ```bash
-npx @vibe-x/agent-better-checkpoint@0.3.0
+npx @vibe-x/agent-better-checkpoint@0.3.1
 ```
 
-This installs the global scripts and stop hook. Projects can also commit `.vibe-x/agent-better-checkpoint/` (config + scripts) for self-contained setup.
+Without `--target`: installs globally. With `--target .`: project-only (skill + hooks in `.cursor/`, scripts in `.vibe-x/`), no global changes.
 
 ---
 

@@ -4,6 +4,9 @@
     "stop": [
       {
         "command": "python3 /workspace/.cursor/hooks/stop/check_precipitation.py"
+      },
+      {
+        "command": "bash .cursor/hooks/check_uncommitted.sh"
       }
     ]
   }
