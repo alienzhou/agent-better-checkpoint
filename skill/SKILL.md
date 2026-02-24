@@ -3,7 +3,7 @@ name: agent-better-checkpoint
 description: "Automatically creates semantic Git checkpoint commits during AI coding sessions. Replaces opaque platform checkpoints with transparent, queryable Git commits using Conventional Commits format with Git Trailers. You MUST follow this skill whenever you make code changes — commit after each meaningful edit."
 license: MIT
 metadata:
-  version: "0.3.1"
+  version: "0.3.2"
   author: "alienzhou"
   category: "version-control"
 ---
@@ -31,7 +31,7 @@ Both `.sh` and `.ps1` are always installed regardless of current OS.
 If neither exists, run:
 
 ```bash
-npx @vibe-x/agent-better-checkpoint@0.3.1
+npx @vibe-x/agent-better-checkpoint@0.3.2
 ```
 
 Without `--target`: installs globally. With `--target .`: project-only (skill + hooks in `.cursor/`, scripts in `.vibe-x/`), no global changes.
@@ -167,4 +167,4 @@ This should feel natural — commit as you go, like any good developer.
 
 ---
 
-**Version**: 0.3.1
+**Version**: 0.3.2

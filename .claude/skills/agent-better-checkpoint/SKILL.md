@@ -29,7 +29,7 @@ Check in order (stop at first hit):
 If neither exists, run:
 
 ```bash
-npx @vibe-x/agent-better-checkpoint@0.3.1
+npx @vibe-x/agent-better-checkpoint@0.3.2
 ```
 
 Without `--target`: installs globally. With `--target .`: project-only (skill + hooks in `.cursor/`, scripts in `.vibe-x/`), no global changes.
