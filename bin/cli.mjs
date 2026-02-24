@@ -225,12 +225,6 @@ function registerCursorHook(osType) {
     hookCmd = `powershell -File "${INSTALL_BASE}\\hooks\\stop\\check_uncommitted.ps1"`;
   }
 
-  // Check if already registered
-  const alreadyRegistered = config.hooks.stop.some(
-    h => typeof h === 'object' && h.command && h.command.includes(SKILL_NAME.replace(/-/g, ''))
-  );
-
-  // More precise check: command includes agent-better-checkpoint
   const registered = config.hooks.stop.some(
     h => typeof h === 'object' && h.command && h.command.includes('agent-better-checkpoint')
   );
@@ -269,15 +263,12 @@ function installProjectOnly(targetDir, aiPlatform, osType) {
     // Cursor 支持项目级 hooks: .cursor/hooks.json + .cursor/hooks/
     const hooksDir = join(root, '.cursor', 'hooks');
     ensureDir(hooksDir);
-    if (osType === 'unix') {
-      copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(hooksDir, 'check_uncommitted.sh'));
-      setExecutable(join(hooksDir, 'check_uncommitted.sh'));
-    } else {
-      copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(hooksDir, 'check_uncommitted.ps1'));
-    }
+    copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(hooksDir, 'check_uncommitted.sh'));
+    setExecutable(join(hooksDir, 'check_uncommitted.sh'));
+    copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(hooksDir, 'check_uncommitted.ps1'));
     const hookCmd = osType === 'unix'
       ? 'bash .cursor/hooks/check_uncommitted.sh'
-      : `powershell -File ".cursor/hooks/check_uncommitted.ps1"`;
+      : `powershell -File ".cursor\\hooks\\check_uncommitted.ps1"`;
     const hooksPath = join(root, '.cursor', 'hooks.json');
     let config = readJsonFile(hooksPath) || { version: 1, hooks: {} };
     if (!config.hooks) config.hooks = {};
@@ -469,8 +460,8 @@ function main() {
       // 优先从项目目录检测平台（与安装时一致），否则用 --platform 或全局检测
       let platform = args.platform;
       if (!platform) {
-        const cursorSkill = join(resolve(projectTargetDir), '.cursor', 'skills', SKILL_NAME);
-        const claudeSkill = join(resolve(projectTargetDir), '.claude', 'skills', SKILL_NAME);
+        const cursorSkill = join(projectTargetDir, '.cursor', 'skills', SKILL_NAME);
+        const claudeSkill = join(projectTargetDir, '.claude', 'skills', SKILL_NAME);
         if (existsSync(cursorSkill)) platform = 'cursor';
         else if (existsSync(claudeSkill)) platform = 'claude';
       }

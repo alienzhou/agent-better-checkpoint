@@ -5,15 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] - 2026-02-24
 
 ### Changed
 
-- **BREAKING**: `--target` is now project-only: when specified, installs only to the target directory (`.cursor/skills/`, `.cursor/hooks.json`, `.vibe-x/`), no global writes. Use without `--target` for global install.
+- `--target` is now project-only: installs skill, hooks, scripts only to the target directory (`.cursor/skills/`, `.cursor/hooks.json`, `.vibe-x/`), no global writes; use without `--target` for global install
+- Project-level hooks use `.cursor/hooks/` with relative path commands, following [Cursor project hooks](https://cursor.com/docs/agent/hooks) convention
+- Project-level skill installed to `.cursor/skills/` (or `.claude/skills/`), following [Cursor project skills](https://cursor.com/docs/context/skills) convention
+- Hook scripts installed for both OS (`.sh` + `.ps1`) in project mode for cross-platform portability
 
 ### Fixed
 
-- Uninstall with `--target` now correctly detects platform from project (cursor vs claude) when `--platform` is omitted
+- Uninstall with `--target` auto-detects platform from project directory when `--platform` is omitted
+- Removed dead `alreadyRegistered` variable in `registerCursorHook`
 
 ---
 
@@ -21,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `--target` option for project-level install: install scripts into a project directory for self-contained setup (commit with repo)
-- Project-local mode: `.vibe-x/agent-better-checkpoint/` can be committed; global hook delegates to project-local scripts when present
+- `--target` option for project-level install
+- Project-local mode: `.vibe-x/agent-better-checkpoint/` can be committed with project
 
 ### Changed
 
@@ -30,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Uninstall now correctly cleans all installed platforms (global + project-local)
+- Uninstall now correctly cleans all installed platforms
 
 ---
 
