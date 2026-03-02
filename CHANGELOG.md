@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - 2026-03-02
+
+### Added
+
+- **AGENTS.md auto-injection**: Project-level installs (`--target`) now automatically inject a checkpoint rule block into `AGENTS.md`
+- Block uses HTML comments for precise identification: `<!-- [ABC:agent-better-checkpoint:start/end] -->`
+- Uninstall automatically removes the injected block (preserves other content)
+
+### Changed
+
+- Improved `description` field following skill guide pattern: `[What it does] + [When to use it] + [Trigger phrases]`
+- Description now includes user trigger phrases: "commit changes", "create checkpoint", "save my progress"
+
+---
+
 ## [0.3.2] - 2026-02-24
 
 ### Changed
