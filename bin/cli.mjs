@@ -143,6 +143,80 @@ function writeJsonFile(filepath, data) {
 }
 
 // ============================================================
+// AGENTS.md block management
+// ============================================================
+
+const AGENTS_BLOCK_START = '<!-- [ABC:agent-better-checkpoint:start] -->';
+const AGENTS_BLOCK_END = '<!-- [ABC:agent-better-checkpoint:end] -->';
+
+const AGENTS_BLOCK_CONTENT = `${AGENTS_BLOCK_START}
+## Checkpoint Commit Rule
+
+After completing any file edit (write_to_file, replace_in_file, multi_replace_in_file, or similar),
+you MUST:
+
+1. Load the "agent-better-checkpoint" skill (if not already loaded)
+2. Follow its instructions to create a checkpoint commit
+3. Do NOT proceed to the next task until the commit is done
+
+This ensures every meaningful code change is tracked with a semantic Git commit.
+${AGENTS_BLOCK_END}`;
+
+function injectAgentsMdBlock(targetDir) {
+  const agentsMdPath = join(targetDir, 'AGENTS.md');
+  let content = '';
+  
+  if (existsSync(agentsMdPath)) {
+    content = readFileSync(agentsMdPath, 'utf-8');
+    // Check if block already exists
+    if (content.includes(AGENTS_BLOCK_START)) {
+      console.log(`  AGENTS.md → block already exists (skipped)`);
+      return;
+    }
+  }
+  
+  // Append block to end of file (or create new file)
+  const newContent = content
+    ? content.trimEnd() + '\n\n' + AGENTS_BLOCK_CONTENT + '\n'
+    : AGENTS_BLOCK_CONTENT + '\n';
+  
+  writeFileSync(agentsMdPath, newContent, 'utf-8');
+  console.log(`  AGENTS.md → ${agentsMdPath}`);
+}
+
+function removeAgentsMdBlock(targetDir) {
+  const agentsMdPath = join(targetDir, 'AGENTS.md');
+  
+  if (!existsSync(agentsMdPath)) {
+    return;
+  }
+  
+  const content = readFileSync(agentsMdPath, 'utf-8');
+  
+  if (!content.includes(AGENTS_BLOCK_START)) {
+    return;
+  }
+  
+  // Remove the block (including surrounding newlines)
+  const blockRegex = new RegExp(
+    `\\n*${AGENTS_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?${AGENTS_BLOCK_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n*`,
+    'g'
+  );
+  
+  let newContent = content.replace(blockRegex, '\n');
+  newContent = newContent.trim();
+  
+  if (newContent === '') {
+    // If file is empty after removal, delete it
+    rmSync(agentsMdPath, { force: true });
+    console.log(`  Removed ${agentsMdPath} (empty after cleanup)`);
+  } else {
+    writeFileSync(agentsMdPath, newContent + '\n', 'utf-8');
+    console.log(`  Cleaned ${agentsMdPath}`);
+  }
+}
+
+// ============================================================
 // Install logic
 // ============================================================
 
@@ -271,6 +345,9 @@ function installProjectOnly(targetDir, aiPlatform, osType) {
     // Claude Code: settings.json 为全局，无项目级 hooks，仅安装 skill 和脚本
     console.log(`  Hooks   → (Claude stop hook is global-only, skipped for project install)`);
   }
+
+  // Inject AGENTS.md block (project-only)
+  injectAgentsMdBlock(root);
 }
 
 function uninstallProjectOnly(targetDir, aiPlatform) {
@@ -326,6 +403,9 @@ function uninstallProjectOnly(targetDir, aiPlatform) {
       rmSync(hooksDir, { recursive: true, force: true });
     }
   }
+
+  // Remove AGENTS.md block
+  removeAgentsMdBlock(root);
 }
 
 function registerClaudeHook(osType) {
