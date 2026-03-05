@@ -42,10 +42,11 @@ fi
 # Platform detection
 # ============================================================
 detect_platform() {
-    if [[ -n "${CLAUDE_CODE:-}" ]] || command -v claude &>/dev/null; then
-        echo "claude-code"
-    elif [[ -n "${CURSOR_VERSION:-}" ]] || [[ -n "${CURSOR_TRACE_ID:-}" ]]; then
+    # 优先检测运行时环境变量（谁在调用），而非安装态（command -v）
+    if [[ -n "${CURSOR_AGENT:-}" ]] || [[ -n "${CURSOR_TRACE_ID:-}" ]] || [[ -n "${CURSOR_VERSION:-}" ]]; then
         echo "cursor"
+    elif [[ -n "${CLAUDE_CODE:-}" ]]; then
+        echo "claude-code"
     else
         echo "unknown"
     fi

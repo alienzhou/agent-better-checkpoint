@@ -38,11 +38,12 @@ $ErrorActionPreference = "Stop"
 # ============================================================
 
 function Detect-Platform {
-    if ($env:CLAUDE_CODE -or (Get-Command claude -ErrorAction SilentlyContinue)) {
-        return "claude-code"
-    }
-    if ($env:CURSOR_VERSION -or $env:CURSOR_TRACE_ID) {
+    # 优先检测运行时环境变量（谁在调用），而非安装态（Get-Command）
+    if ($env:CURSOR_AGENT -or $env:CURSOR_TRACE_ID -or $env:CURSOR_VERSION) {
         return "cursor"
+    }
+    if ($env:CLAUDE_CODE) {
+        return "claude-code"
     }
     return "unknown"
 }
