@@ -10,3 +10,9 @@ discussions:
     - name: D01-trigger-control-model.md
       mtime: 1771935082.124692
     notes: []
+  2026-03-05/concurrent-painting-attribution:
+    outline:
+      mtime: 1772716821.5105057
+      change_count: 2
+    decisions: []
+    notes: []

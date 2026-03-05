@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.3] - 2026-03-02
+## [0.3.3] - 2026-03-05
 
 ### Added
 
@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improved `description` field following skill guide pattern: `[What it does] + [When to use it] + [Trigger phrases]`
 - Description now includes user trigger phrases: "commit changes", "create checkpoint", "save my progress"
+
+### Fixed
+
+- **Platform detection**: Use runtime env vars instead of `command -v` / `Get-Command`. Priority: `CURSOR_AGENT` / `CURSOR_TRACE_ID` → cursor; `CLAUDE_CODE` → claude-code. Fixes misdetection when claude CLI is installed but running in Cursor.
 
 ---
 
