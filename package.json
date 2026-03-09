@@ -1,6 +1,6 @@
 {
   "name": "@vibe-x/agent-better-checkpoint",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Semantic Git checkpoint commits for AI coding sessions",
   "type": "module",
   "bin": {
@@ -10,8 +10,14 @@
     "bin/",
     "platform/",
     "skill/",
-    "LICENSE"
+    "LICENSE",
+    "scripts/"
   ],
+  "scripts": {
+    "release:check": "node ./scripts/release-check.mjs",
+    "preversion": "npm run release:check",
+    "prepublishOnly": "npm run release:check"
+  },
   "keywords": [
     "ai",
     "agent",

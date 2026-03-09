@@ -60,10 +60,23 @@ AGENT_PLATFORM=$(detect_platform)
 truncate_prompt() {
     local prompt="$1"
     local max_len=60
+
+    # Ensure UTF-8 character-based (not byte-based) string operations.
+    # Without this, ${#prompt} and ${prompt:0:n} count bytes in C locale,
+    # which breaks multi-byte characters (e.g., Chinese) mid-character.
+    local old_lc_all="${LC_ALL:-}"
+    export LC_ALL=en_US.UTF-8
+
     local len=${#prompt}
 
     if [[ $len -le $max_len ]]; then
         echo "$prompt"
+        # Restore LC_ALL
+        if [[ -n "$old_lc_all" ]]; then
+            export LC_ALL="$old_lc_all"
+        else
+            unset LC_ALL
+        fi
         return
     fi
 
@@ -71,6 +84,14 @@ truncate_prompt() {
     local tail_len=$(( max_len - 3 - head_len ))
     local head="${prompt:0:$head_len}"
     local tail="${prompt:$((len - tail_len)):$tail_len}"
+
+    # Restore LC_ALL
+    if [[ -n "$old_lc_all" ]]; then
+        export LC_ALL="$old_lc_all"
+    else
+        unset LC_ALL
+    fi
+
     echo "${head}...${tail}"
 }
 
