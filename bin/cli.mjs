@@ -38,7 +38,7 @@ const CONFIG_TEMPLATE = join(PLATFORM_DIR, 'config.template.yml');
 // ============================================================
 
 function parseArgs(argv) {
-  const args = { platform: null, uninstall: false, target: null };
+  const args = { platform: null, uninstall: false, target: null, activate: false };
   for (let i = 2; i < argv.length; i++) {
     switch (argv[i]) {
       case '--platform':
@@ -57,6 +57,9 @@ function parseArgs(argv) {
         break;
       case '--uninstall':
         args.uninstall = true;
+        break;
+      case '--activate':
+        args.activate = true;
         break;
       case '--help':
       case '-h':
@@ -82,6 +85,7 @@ Usage:
 Options:
   --platform <cursor|claude>  Target AI platform (auto-detected if omitted)
   --target <path>             Project-only install (no global). Use . for cwd
+  --activate                  Activate checkpoint rules in current project (AGENTS.md only)
   --uninstall                 Remove installed files and hook registrations
   -h, --help                  Show this help message
 `);
@@ -504,6 +508,123 @@ function unregisterClaudeHook() {
 }
 
 // ============================================================
+// Activate logic (AGENTS.md only, with installation check)
+// ============================================================
+
+const SUPPORTED_PLATFORMS = ['cursor', 'claude'];
+
+function checkGlobalInstallation() {
+  const home = homedir();
+  const results = {
+    hasScripts: existsSync(join(INSTALL_BASE, 'scripts', 'checkpoint.sh')) ||
+                existsSync(join(INSTALL_BASE, 'scripts', 'checkpoint.ps1')),
+    platforms: {}
+  };
+  
+  for (const p of SUPPORTED_PLATFORMS) {
+    const skillDir = p === 'cursor' ? '.cursor' : '.claude';
+    results.platforms[p] = {
+      hasSkill: existsSync(join(home, skillDir, 'skills', SKILL_NAME, 'SKILL.md'))
+    };
+  }
+  
+  results.hasAnySkill = SUPPORTED_PLATFORMS.some(p => results.platforms[p].hasSkill);
+  results.isFullyInstalled = results.hasScripts && results.hasAnySkill;
+  return results;
+}
+
+function checkProjectInstallation(targetDir) {
+  const root = resolve(targetDir);
+  const results = {
+    hasScripts: existsSync(join(root, '.vibe-x', 'agent-better-checkpoint', 'checkpoint.sh')) ||
+                existsSync(join(root, '.vibe-x', 'agent-better-checkpoint', 'checkpoint.ps1')),
+    platforms: {}
+  };
+  
+  for (const p of SUPPORTED_PLATFORMS) {
+    const skillDir = p === 'cursor' ? '.cursor' : '.claude';
+    results.platforms[p] = {
+      hasSkill: existsSync(join(root, skillDir, 'skills', SKILL_NAME, 'SKILL.md'))
+    };
+  }
+  
+  results.hasAnySkill = SUPPORTED_PLATFORMS.some(p => results.platforms[p].hasSkill);
+  results.isFullyInstalled = results.hasScripts && results.hasAnySkill;
+  return results;
+}
+
+function activateProject(targetDir) {
+  const root = resolve(targetDir);
+  
+  // Check if already has AGENTS.md block
+  const agentsMdPath = join(root, 'AGENTS.md');
+  if (existsSync(agentsMdPath)) {
+    const content = readFileSync(agentsMdPath, 'utf-8');
+    if (content.includes(AGENTS_BLOCK_START)) {
+      console.log(`\n⚠️  AGENTS.md already contains checkpoint rules. Nothing to do.`);
+      return;
+    }
+  }
+
+  // Step 1: Check project-level installation (all platforms)
+  const projectStatus = checkProjectInstallation(root);
+  if (projectStatus.isFullyInstalled) {
+    // Project has both scripts and skill for at least one platform
+    console.log(`\n[Activate] Adding checkpoint rules to ${root}...`);
+    injectAgentsMdBlock(root);
+    console.log(`\n✅ Activation complete!`);
+    console.log(`\nThe AI agent will now follow checkpoint commit rules in this project.`);
+    return;
+  }
+
+  // Step 2: Check global installation (all platforms)
+  const globalStatus = checkGlobalInstallation();
+  if (globalStatus.isFullyInstalled) {
+    // Global has both scripts and skill for at least one platform
+    console.log(`\n[Activate] Adding checkpoint rules to ${root}...`);
+    injectAgentsMdBlock(root);
+    console.log(`\n✅ Activation complete!`);
+    console.log(`\nThe AI agent will now follow checkpoint commit rules in this project.`);
+    return;
+  }
+
+  // Step 3: Neither project nor global is fully installed - provide detailed diagnosis
+  const hasAnyProjectSkill = projectStatus.hasAnySkill;
+  const hasAnyGlobalSkill = globalStatus.hasAnySkill;
+  const hasAnyProjectScripts = projectStatus.hasScripts;
+  const hasAnyGlobalScripts = globalStatus.hasScripts;
+
+  const hasAnySkill = hasAnyProjectSkill || hasAnyGlobalSkill;
+  const hasAnyScripts = hasAnyProjectScripts || hasAnyGlobalScripts;
+
+  if (!hasAnySkill && !hasAnyScripts) {
+    console.log(`\n⚠️  No agent-better-checkpoint installation detected.`);
+    console.log(`\nChecked locations:`);
+    console.log(`  Project: ${root}`);
+    console.log(`  Global:  ${INSTALL_BASE}`);
+    console.log(`\nPlease install first:`);
+    console.log(`  Global:        npx @vibe-x/agent-better-checkpoint`);
+    console.log(`  Project-only:  npx @vibe-x/agent-better-checkpoint --target . --platform cursor|claude`);
+    console.log(`\nThen run --activate again.`);
+    process.exit(1);
+  }
+
+  if (!hasAnySkill) {
+    console.log(`\n⚠️  Checkpoint scripts found, but skill (SKILL.md) is missing.`);
+    console.log(`\nThe AI agent needs the skill to know how to commit. Please run:`);
+    console.log(`  npx @vibe-x/agent-better-checkpoint --platform cursor|claude`);
+    process.exit(1);
+  }
+
+  if (!hasAnyScripts) {
+    console.log(`\n⚠️  Skill found, but checkpoint scripts are missing.`);
+    console.log(`\nPlease reinstall to get the scripts:`);
+    console.log(`  npx @vibe-x/agent-better-checkpoint`);
+    process.exit(1);
+  }
+}
+
+// ============================================================
 // Main entry
 // ============================================================
 
@@ -513,7 +634,7 @@ function main() {
   const aiPlatform = args.platform || detectAIPlatform();
   const projectTargetDir = args.target ? resolve(args.target) : null;
 
-  if (!aiPlatform && !projectTargetDir && !args.uninstall) {
+  if (!aiPlatform && !projectTargetDir && !args.uninstall && !args.activate) {
     console.error(
       'Error: could not detect AI platform.\n' +
       'Please specify: npx @vibe-x/agent-better-checkpoint --platform cursor|claude'
@@ -556,6 +677,10 @@ function main() {
       if (platforms.length === 0) console.log('\nNo global installation found.');
     }
     console.log('\n✅ Uninstallation complete!');
+  } else if (args.activate) {
+    // Activate: only inject AGENTS.md, check installation first
+    const targetDir = projectTargetDir || process.cwd();
+    activateProject(targetDir);
   } else {
     if (projectTargetDir) {
       if (!aiPlatform) {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.4] - 2026-03-09
 
+### Added
+
+- **`--activate` command**: Lightweight project activation — injects checkpoint rules into `AGENTS.md` without full project-local install. Requires prior global or project-level installation. Includes installation status diagnosis with actionable guidance when prerequisites are missing.
+
 ### Fixed
 
 - **UTF-8 prompt truncation (Unix)**: Fix garbled text when truncating multi-byte prompts (e.g., Chinese) under `LC_ALL=C` / C locale by forcing UTF-8 locale during truncation.
