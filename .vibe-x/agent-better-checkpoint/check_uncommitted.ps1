@@ -3,8 +3,17 @@
     check_uncommitted.ps1 — Stop Hook: check for uncommitted changes (Windows PowerShell)
 
 .DESCRIPTION
-    Project-local script. Config: .vibe-x/agent-better-checkpoint/config.yml
-    Same protocol as global version; can be committed with the project.
+    Triggered at AI conversation end. Checks workspace for uncommitted changes.
+    If found, outputs reminder for AI Agent to run fallback checkpoint commit.
+
+    Supported platforms:
+    - Cursor: stop hook (stdin JSON with workspace_roots)
+    - Claude Code: Stop hook (stdin JSON with hook_event_name)
+
+    Output protocol:
+    - OK: {} (empty JSON)
+    - Block (Cursor): {"followup_message": "..."}
+    - Block (Claude Code): {"decision": "block", "reason": "..."}
 
     Config: .vibe-x/agent-better-checkpoint/config.yml (project-level, optional)
 #>
@@ -76,9 +85,11 @@ function Parse-CheckpointConfig {
     $inPassiveSection = $false
 
     foreach ($line in $lines) {
+        # Skip comments
         if ($line -match '^\s*#') { continue }
         if (-not $line.Trim()) { continue }
 
+        # Thresholds under trigger_if_any
         if ($line -match '^\s+min_changed_lines:\s*(\d+)') {
             $config.MinChangedLines = [int]$Matches[1]
             continue
@@ -88,6 +99,7 @@ function Parse-CheckpointConfig {
             continue
         }
 
+        # passive_patterns section
         if ($line -match '^passive_patterns:') {
             $inPassiveSection = $true
             continue
@@ -121,18 +133,21 @@ function Test-PassiveFile {
     )
 
     foreach ($pattern in $Patterns) {
+        # dir/** → match all files under dir/
         if ($pattern -match '^(.+)/\*\*$') {
             $prefix = $Matches[1] + "/"
             if ($FilePath.StartsWith($prefix)) { return $true }
             continue
         }
 
+        # *.ext → match suffix
         if ($pattern -match '^\*(\..+)$') {
             $suffix = $Matches[1]
             if ($FilePath.EndsWith($suffix)) { return $true }
             continue
         }
 
+        # Exact match
         if ($FilePath -eq $pattern) { return $true }
     }
 
@@ -152,6 +167,7 @@ function Get-ChangedLineCount {
     if ($Files.Count -eq 0) { return 0 }
     $total = 0
 
+    # Tracked files: staged + unstaged
     $diffArgs = @("-C", $Workspace, "diff", "--numstat", "--") + $Files
     $cachedArgs = @("-C", $Workspace, "diff", "--cached", "--numstat", "--") + $Files
 
@@ -169,6 +185,7 @@ function Get-ChangedLineCount {
         }
     }
 
+    # Untracked files: total lines count as changes
     foreach ($file in $Files) {
         $untracked = git -C $Workspace ls-files --others --exclude-standard -- $file 2>$null
         if ($untracked) {
@@ -268,14 +285,22 @@ function Build-Reminder {
     $Changes = Get-ChangeSummary -Path $Workspace
     $ChangesIndented = ($Changes -split "`n" | ForEach-Object { "  $_" }) -join "`n"
 
-    # Project-local: use project-local script path when present
+    # Project-local script; fallback to global
     $checkpointSh = "~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh"
-    $checkpointPs1 = "`$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\checkpoint.ps1"
+    $checkpointPs1 = "`$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1"
+    $allocPatchSh = "~/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.sh"
+    $allocPatchPs1 = "`$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.ps1"
     if (Test-Path (Join-Path $Workspace ".vibe-x/agent-better-checkpoint/checkpoint.sh")) {
         $checkpointSh = ".vibe-x/agent-better-checkpoint/checkpoint.sh"
     }
     if (Test-Path (Join-Path $Workspace ".vibe-x/agent-better-checkpoint/checkpoint.ps1")) {
         $checkpointPs1 = ".\.vibe-x\agent-better-checkpoint\checkpoint.ps1"
+    }
+    if (Test-Path (Join-Path $Workspace ".vibe-x/agent-better-checkpoint/alloc_patch.sh")) {
+        $allocPatchSh = ".vibe-x/agent-better-checkpoint/alloc_patch.sh"
+    }
+    if (Test-Path (Join-Path $Workspace ".vibe-x/agent-better-checkpoint/alloc_patch.ps1")) {
+        $allocPatchPs1 = ".\.vibe-x\agent-better-checkpoint\alloc_patch.ps1"
     }
 
     return @"
@@ -288,17 +313,24 @@ There are uncommitted changes in the workspace. Please create a checkpoint commi
 $ChangesIndented
 ``````
 
-**Action Required**: Run the checkpoint script to commit these changes:
+**Action Required**: Allocate a patch file, write only the selected hunks for this conversation, then run the checkpoint script.
 
 **macOS/Linux:**
 ``````bash
-$checkpointSh "checkpoint(<scope>): <description>" "<user-prompt>" --type fallback
+PATCH_JSON=$($allocPatchSh --workspace "$Workspace")
+PATCH_PATH=$(printf '%s' "$PATCH_JSON" | python3 -c 'import sys,json; print(json.load(sys.stdin)["path"])')
+# Write only the selected hunks for this conversation to "$PATCH_PATH" as a unified diff patch.
+$checkpointSh "checkpoint(<scope>): <description>" "<user-prompt>" --type fallback --patch-file "$PATCH_PATH"
 ``````
 
 **Windows (PowerShell):**
 ``````powershell
-powershell -File "$checkpointPs1" "checkpoint(<scope>): <description>" "<user-prompt>" -Type fallback
+$patch = powershell -File "$allocPatchPs1" -Workspace "$Workspace" | ConvertFrom-Json
+# Write only the selected hunks for this conversation to $patch.path as a unified diff patch.
+powershell -File "$checkpointPs1" "checkpoint(<scope>): <description>" "<user-prompt>" -Type fallback -PatchFile $patch.path
 ``````
+
+If the checkpoint script returns an `ABC_PATCH_*` error, do not fall back to a full commit automatically. Explain the conflict and ask the user how to proceed.
 "@
 }
 
@@ -307,6 +339,7 @@ powershell -File "$checkpointPs1" "checkpoint(<scope>): <description>" "<user-pr
 # ============================================================
 
 $InputData = $null
+$rawInput = ""
 try {
     $rawInput = [Console]::In.ReadToEnd()
     if ($rawInput.Trim()) {
@@ -324,10 +357,18 @@ if ($InputData -and $InputData.PSObject.Properties["stop_hook_active"]) {
 $Platform = Detect-Platform -InputData $InputData
 $Workspace = Get-WorkspaceRoot -InputData $InputData
 
+# Delegate to project-local script when present (committed with project)
+$ProjectScript = Join-Path $Workspace ".vibe-x/agent-better-checkpoint/check_uncommitted.ps1"
+if (Test-Path $ProjectScript -PathType Leaf) {
+    $rawInput | & $ProjectScript
+    exit $LASTEXITCODE
+}
+
 if (-not (Test-GitRepo -Path $Workspace)) {
     Output-Allow
 }
 
+# Get all changes
 $StatusOutput = git -C $Workspace status --porcelain 2>$null
 if (-not $StatusOutput) {
     Output-Allow
@@ -337,13 +378,14 @@ if (-not $StatusOutput) {
 $ConfigFile = Join-Path $Workspace $CONFIG_FILE_NAME
 $Config = Parse-CheckpointConfig -ConfigPath $ConfigFile
 
-# Split active vs passive files
+# ---- 分离主动/被动文件 ----
 $ActiveFiles = @()
 $PassiveFilesList = @()
 
 foreach ($line in ($StatusOutput -split "`n")) {
     if ($line.Length -lt 4) { continue }
     $file = $line.Substring(3)
+    # Handle rename
     if ($file -match ' -> (.+)$') {
         $file = $Matches[1]
     }
@@ -357,23 +399,28 @@ foreach ($line in ($StatusOutput -split "`n")) {
     }
 }
 
+# ---- 无主动文件 → 仅被动变更，跳过 ----
 if ($ActiveFiles.Count -eq 0) {
     Output-Allow -Info "Skipped: only passive file changes ($($PassiveFilesList.Count) files). Patterns: $($Config.PassivePatterns -join ', ')"
 }
 
+# ---- 无阈值配置 → 有主动变更就触发 ----
 if ($null -eq $Config.MinChangedLines -and $null -eq $Config.MinChangedFiles) {
     $Reminder = Build-Reminder -Workspace $Workspace
     Output-Block -Message $Reminder -Platform $Platform
 }
 
+# ---- 检查触发条件（OR 关系） ----
 $Triggered = $false
 $ActiveFileCount = $ActiveFiles.Count
 $ActiveLineCount = 0
 
+# Check file count first (cheaper)
 if ($null -ne $Config.MinChangedFiles -and $ActiveFileCount -ge $Config.MinChangedFiles) {
     $Triggered = $true
 }
 
+# Then check line count
 if (-not $Triggered -and $null -ne $Config.MinChangedLines) {
     $ActiveLineCount = Get-ChangedLineCount -Workspace $Workspace -Files $ActiveFiles
     if ($ActiveLineCount -ge $Config.MinChangedLines) {
@@ -382,7 +429,10 @@ if (-not $Triggered -and $null -ne $Config.MinChangedLines) {
 }
 
 if (-not $Triggered) {
-    if ($ActiveLineCount -eq 0) {
+    if ($ActiveLineCount -eq 0 -and $null -ne $Config.MinChangedLines) {
+        # Already computed
+    }
+    elseif ($ActiveLineCount -eq 0) {
         $ActiveLineCount = Get-ChangedLineCount -Workspace $Workspace -Files $ActiveFiles
     }
     $minFilesStr = if ($null -ne $Config.MinChangedFiles) { $Config.MinChangedFiles } else { "unset" }
@@ -390,5 +440,6 @@ if (-not $Triggered) {
     Output-Allow -Info "Skipped: changes below threshold ($ActiveFileCount files, $ActiveLineCount lines). Config: min_changed_files=$minFilesStr, min_changed_lines=$minLinesStr"
 }
 
+# ---- 达到阈值，触发提交提醒 ----
 $Reminder = Build-Reminder -Workspace $Workspace
 Output-Block -Message $Reminder -Platform $Platform

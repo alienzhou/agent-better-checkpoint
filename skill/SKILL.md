@@ -3,7 +3,7 @@ name: agent-better-checkpoint
 description: "Creates semantic Git checkpoint commits during AI coding sessions with Conventional Commits format and Git Trailers. Use after completing code edits, or when user says 'commit changes', 'create checkpoint', or 'save my progress'."
 license: MIT
 metadata:
-  version: "0.3.3"
+  version: "0.3.4"
   author: "alienzhou"
   category: "version-control"
 ---
@@ -31,7 +31,7 @@ Both `.sh` and `.ps1` are always installed regardless of current OS.
 If neither exists, run:
 
 ```bash
-npx @vibe-x/agent-better-checkpoint@0.3.3
+npx @vibe-x/agent-better-checkpoint@0.3.4
 ```
 
 Without `--target`: installs globally. With `--target .`: project-only (skill + hooks in `.cursor/`, scripts in `.vibe-x/`), no global changes.
@@ -99,14 +99,16 @@ Switch to flex-column layout with collapsible sidebar.
 
 ## 🛠️ How to Commit
 
-Call the checkpoint script after composing your message. Both `.sh` and `.ps1` are always available — pick the one matching the current OS.
+Default to the patch-based flow when you can clearly identify the hunks from the current logical unit of work. Fall back to the full-workspace commit flow only when the user explicitly wants everything committed together.
 
 **Prefer project-local when present**, fall back to global:
 
-| OS | Project-local | Global fallback |
-|----|--------------|-----------------|
-| macOS/Linux | `.vibe-x/agent-better-checkpoint/checkpoint.sh` | `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` |
-| Windows | `powershell -File ".vibe-x\agent-better-checkpoint\checkpoint.ps1"` | `powershell -File "$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\checkpoint.ps1"` |
+| Script | macOS/Linux | Windows |
+|--------|-------------|---------|
+| checkpoint | `.vibe-x/agent-better-checkpoint/checkpoint.sh` | `powershell -File ".vibe-x\agent-better-checkpoint\checkpoint.ps1"` |
+| alloc_patch | `.vibe-x/agent-better-checkpoint/alloc_patch.sh` | `powershell -File ".vibe-x\agent-better-checkpoint\alloc_patch.ps1"` |
+| global checkpoint | `~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh` | `powershell -File "$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\checkpoint.ps1"` |
+| global alloc_patch | `~/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.sh` | `powershell -File "$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\alloc_patch.ps1"` |
 
 ### Parameters:
 
@@ -115,8 +117,35 @@ Call the checkpoint script after composing your message. Both `.sh` and `.ps1` a
 | message (1st arg) | Yes | Full commit message (subject + blank line + body) |
 | user-prompt (2nd arg) | No | The user's original prompt/request |
 | `--type` / `-Type` | No | `auto` (default) or `fallback` |
+| `--patch-file` / `-PatchFile` | No | Apply only the selected hunks from a unified diff patch before commit |
 
-### Example (macOS/Linux):
+### Recommended patch flow (macOS/Linux):
+
+```bash
+PATCH_JSON=$(.vibe-x/agent-better-checkpoint/alloc_patch.sh --workspace "$PWD")
+PATCH_PATH=$(printf '%s' "$PATCH_JSON" | python3 -c 'import sys,json; print(json.load(sys.stdin)["path"])')
+# Write only the selected hunks for this logical unit to "$PATCH_PATH" as a unified diff patch.
+.vibe-x/agent-better-checkpoint/checkpoint.sh \
+  "checkpoint(auth): add JWT token refresh logic
+
+Implement automatic token refresh when access token expires.
+Uses refresh token rotation for security." \
+  "帮我实现 token 刷新机制" \
+  --patch-file "$PATCH_PATH"
+```
+
+### Recommended patch flow (Windows):
+
+```powershell
+$patch = powershell -File ".vibe-x\agent-better-checkpoint\alloc_patch.ps1" -Workspace (Get-Location).Path | ConvertFrom-Json
+# Write only the selected hunks for this logical unit to $patch.path as a unified diff patch.
+powershell -File ".vibe-x\agent-better-checkpoint\checkpoint.ps1" `
+  "checkpoint(auth): add JWT token refresh logic`n`nImplement automatic token refresh when access token expires.`nUses refresh token rotation for security." `
+  "帮我实现 token 刷新机制" `
+  -PatchFile $patch.path
+```
+
+### Full-workspace fallback example (macOS/Linux):
 
 ```bash
 .vibe-x/agent-better-checkpoint/checkpoint.sh \
@@ -127,19 +156,12 @@ Uses refresh token rotation for security." \
   "帮我实现 token 刷新机制"
 ```
 
-### Example (Windows):
-
-```powershell
-powershell -File ".vibe-x\agent-better-checkpoint\checkpoint.ps1" `
-  "checkpoint(auth): add JWT token refresh logic`n`nImplement automatic token refresh when access token expires.`nUses refresh token rotation for security." `
-  "帮我实现 token 刷新机制"
-```
-
 ### What the script does:
 1. Truncates user prompt to ≤60 characters (head...tail)
 2. Appends Git Trailers: `Agent`, `Checkpoint-Type`, `User-Prompt`
-3. Runs `git add -A && git commit`
-4. Exits gracefully if there are no changes
+3. Either runs `git add -A && git commit` or applies the selected patch hunks and then commits
+4. Returns `ABC_PATCH_*` errors when the selected patch cannot be committed safely
+5. Exits gracefully if there are no changes
 
 ---
 
@@ -167,4 +189,4 @@ This should feel natural — commit as you go, like any good developer.
 
 ---
 
-**Version**: 0.3.3
+**Version**: 0.3.4

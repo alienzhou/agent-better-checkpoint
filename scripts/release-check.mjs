@@ -52,28 +52,75 @@ function ensureChangelogHasVersion(version) {
   ok(`CHANGELOG contains ${version}`);
 }
 
-function ensureUnixCheckpointScriptsInSync() {
-  const aPath = 'platform/unix/checkpoint.sh';
-  const bPath = '.vibe-x/agent-better-checkpoint/checkpoint.sh';
-
-  if (!fileExists(bPath)) {
-    // Some installs may not keep project-local copy in repo; if missing, just warn.
-    console.warn(`[release:check] WARN: ${bPath} not found; skipping sync check.`);
+function ensureFilesInSync(sourcePath, mirrorPath, label) {
+  if (!fileExists(mirrorPath)) {
+    console.warn(`[release:check] WARN: ${mirrorPath} not found; skipping sync check for ${label}.`);
     return;
   }
 
-  const a = readText(aPath);
-  const b = readText(bPath);
+  const sourceText = readText(sourcePath).replace(/\r\n/g, '\n');
+  const mirrorText = readText(mirrorPath).replace(/\r\n/g, '\n');
 
-  // Normalize line endings
-  const na = a.replace(/\r\n/g, '\n');
-  const nb = b.replace(/\r\n/g, '\n');
-
-  if (sha256(na) !== sha256(nb)) {
-    fail(`Unix checkpoint scripts out of sync:\n- ${aPath}\n- ${bPath}\nPlease update both or regenerate project-local copy.`);
+  if (sha256(sourceText) !== sha256(mirrorText)) {
+    fail(`${label} out of sync:\n- ${sourcePath}\n- ${mirrorPath}\nPlease update both or regenerate project-local copy.`);
   }
 
-  ok('unix checkpoint.sh copies are in sync');
+  ok(`${label} copies are in sync`);
+}
+
+function ensureProjectLocalScriptsInSync() {
+  const pairs = [
+    {
+      sourcePath: 'platform/unix/checkpoint.sh',
+      mirrorPath: '.vibe-x/agent-better-checkpoint/checkpoint.sh',
+      label: 'unix checkpoint.sh',
+    },
+    {
+      sourcePath: 'platform/unix/check_uncommitted.sh',
+      mirrorPath: '.vibe-x/agent-better-checkpoint/check_uncommitted.sh',
+      label: 'unix check_uncommitted.sh',
+    },
+    {
+      sourcePath: 'platform/win/checkpoint.ps1',
+      mirrorPath: '.vibe-x/agent-better-checkpoint/checkpoint.ps1',
+      label: 'windows checkpoint.ps1',
+    },
+    {
+      sourcePath: 'platform/win/check_uncommitted.ps1',
+      mirrorPath: '.vibe-x/agent-better-checkpoint/check_uncommitted.ps1',
+      label: 'windows check_uncommitted.ps1',
+    },
+    {
+      sourcePath: 'platform/unix/alloc_patch.sh',
+      mirrorPath: '.vibe-x/agent-better-checkpoint/alloc_patch.sh',
+      label: 'unix alloc_patch.sh',
+    },
+    {
+      sourcePath: 'platform/win/alloc_patch.ps1',
+      mirrorPath: '.vibe-x/agent-better-checkpoint/alloc_patch.ps1',
+      label: 'windows alloc_patch.ps1',
+    },
+  ];
+
+  for (const pair of pairs) {
+    ensureFilesInSync(pair.sourcePath, pair.mirrorPath, pair.label);
+  }
+}
+
+function ensureSkillVersionMatches(version) {
+  const skill = readText('skill/SKILL.md');
+  const requiredSnippets = [
+    `version: "${version}"`,
+    `@vibe-x/agent-better-checkpoint@${version}`,
+    `**Version**: ${version}`,
+  ];
+
+  const missing = requiredSnippets.filter((snippet) => !skill.includes(snippet));
+  if (missing.length > 0) {
+    fail(`skill/SKILL.md is missing current version references for ${version}:\n- ${missing.join('\n- ')}`);
+  }
+
+  ok(`skill/SKILL.md references ${version}`);
 }
 
 function main() {
@@ -86,8 +133,9 @@ function main() {
   if (!version) fail('package.json missing version field.');
 
   ensureCleanWorktree();
-  ensureUnixCheckpointScriptsInSync();
+  ensureProjectLocalScriptsInSync();
   ensureChangelogHasVersion(version);
+  ensureSkillVersionMatches(version);
 
   ok(`release checks passed for ${pkg.name}@${version}`);
 }

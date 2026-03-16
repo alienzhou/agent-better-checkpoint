@@ -427,7 +427,7 @@ build_and_output_reminder() {
     changes_indented=$(echo "$changes" | sed 's/^/  /')
 
     # Project-local script; fallback to global
-    local checkpoint_cmd_sh checkpoint_cmd_ps1
+    local checkpoint_cmd_sh checkpoint_cmd_ps1 alloc_patch_cmd_sh alloc_patch_cmd_ps1
     if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/checkpoint.sh" ]]; then
         checkpoint_cmd_sh=".vibe-x/agent-better-checkpoint/checkpoint.sh"
     else
@@ -437,6 +437,16 @@ build_and_output_reminder() {
         checkpoint_cmd_ps1='.\\.vibe-x\\agent-better-checkpoint\\checkpoint.ps1'
     else
         checkpoint_cmd_ps1='\$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1'
+    fi
+    if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/alloc_patch.sh" ]]; then
+        alloc_patch_cmd_sh=".vibe-x/agent-better-checkpoint/alloc_patch.sh"
+    else
+        alloc_patch_cmd_sh="~/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.sh"
+    fi
+    if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/alloc_patch.ps1" ]]; then
+        alloc_patch_cmd_ps1='.\\.vibe-x\\agent-better-checkpoint\\alloc_patch.ps1'
+    else
+        alloc_patch_cmd_ps1='\$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.ps1'
     fi
 
     local reminder
@@ -449,17 +459,24 @@ There are uncommitted changes in the workspace. Please create a checkpoint commi
 ${changes_indented}
 \`\`\`
 
-**Action Required**: Run the checkpoint script to commit these changes:
+**Action Required**: Allocate a patch file, write only the selected hunks for this conversation, then run the checkpoint script.
 
 **macOS/Linux:**
 \`\`\`bash
-${checkpoint_cmd_sh} \"checkpoint(<scope>): <description>\" \"<user-prompt>\" --type fallback
+PATCH_JSON=\$(${alloc_patch_cmd_sh} --workspace \"${workspace}\")
+PATCH_PATH=\$(printf '%s' \"\$PATCH_JSON\" | python3 -c 'import sys,json; print(json.load(sys.stdin)["path"])')
+# Write only the selected hunks for this conversation to \"\$PATCH_PATH\" as a unified diff patch.
+${checkpoint_cmd_sh} \"checkpoint(<scope>): <description>\" \"<user-prompt>\" --type fallback --patch-file \"\$PATCH_PATH\"
 \`\`\`
 
 **Windows (PowerShell):**
 \`\`\`powershell
-powershell -File \"${checkpoint_cmd_ps1}\" \"checkpoint(<scope>): <description>\" \"<user-prompt>\" -Type fallback
-\`\`\`"
+\$patch = powershell -File \"${alloc_patch_cmd_ps1}\" -Workspace \"${workspace}\" | ConvertFrom-Json
+# Write only the selected hunks for this conversation to \$patch.path as a unified diff patch.
+powershell -File \"${checkpoint_cmd_ps1}\" \"checkpoint(<scope>): <description>\" \"<user-prompt>\" -Type fallback -PatchFile \$patch.path
+\`\`\`
+
+If the checkpoint script returns an \`ABC_PATCH_*\` error, do not fall back to a full commit automatically. Explain the conflict and ask the user how to proceed."
 
     output_block "$reminder" "$platform"
 }

@@ -2,18 +2,22 @@
 #
 # check_uncommitted.sh — Stop Hook: check for uncommitted changes
 #
-# Project-local script. Config: .vibe-x/agent-better-checkpoint/config.yml
-# Same protocol as global version; can be committed with the project.
+# Triggered at AI conversation end. Checks workspace for uncommitted changes.
+# If found, outputs reminder for AI Agent to run fallback checkpoint commit.
+#
+# Supported platforms:
+#   - Cursor: stop hook (stdin JSON with workspace_roots)
+#   - Claude Code: Stop hook (stdin JSON with hook_event_name)
+#
+# Output protocol:
+#   - OK: {} (empty JSON)
+#   - Block (Cursor): {"followup_message": "..."}
+#   - Block (Claude Code): {"decision": "block", "reason": "..."}
 #
 # Config: .vibe-x/agent-better-checkpoint/config.yml (project-level, optional)
 # JSON parsing uses grep+sed, no jq dependency.
 
 set -euo pipefail
-
-# ============================================================
-# Config path (project-local: same dir structure)
-# ============================================================
-CONFIG_FILE_NAME=".vibe-x/agent-better-checkpoint/config.yml"
 
 # ============================================================
 # Helpers: simple JSON field extraction (no jq)
@@ -37,10 +41,18 @@ json_bool() {
     fi
 }
 
+json_string() {
+    local json="$1" field="$2"
+    echo "$json" | grep -oE "\"${field}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
+        | sed -E "s/\"${field}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\"/\1/" \
+        | head -1
+}
+
 json_workspace_root() {
     local json="$1"
+    local result=""
+
     for field in "workspace_roots" "workspaceRoots"; do
-        local result
         result=$(echo "$json" \
             | grep -oE "\"${field}\"[[:space:]]*:[[:space:]]*\[[^]]*\]" \
             | grep -oE '"[^"]*"' \
@@ -55,23 +67,29 @@ json_workspace_root() {
 }
 
 # ============================================================
-# Config parsing
+# Config parsing (.vibe-x/agent-better-checkpoint/config.yml)
 # ============================================================
+
+CONFIG_FILE_NAME=".vibe-x/agent-better-checkpoint/config.yml"
 
 parse_min_changed_lines() {
     local config="$1"
     [[ -f "$config" ]] || return 0
-    grep -E '^[[:space:]]+min_changed_lines:[[:space:]]*[0-9]+' "$config" 2>/dev/null \
+    local val
+    val=$(grep -E '^[[:space:]]+min_changed_lines:[[:space:]]*[0-9]+' "$config" 2>/dev/null \
         | sed -E 's/.*min_changed_lines:[[:space:]]*([0-9]+).*/\1/' \
-        | head -1 || true
+        | head -1 || true)
+    echo "${val:-}"
 }
 
 parse_min_changed_files() {
     local config="$1"
     [[ -f "$config" ]] || return 0
-    grep -E '^[[:space:]]+min_changed_files:[[:space:]]*[0-9]+' "$config" 2>/dev/null \
+    local val
+    val=$(grep -E '^[[:space:]]+min_changed_files:[[:space:]]*[0-9]+' "$config" 2>/dev/null \
         | sed -E 's/.*min_changed_files:[[:space:]]*([0-9]+).*/\1/' \
-        | head -1 || true
+        | head -1 || true)
+    echo "${val:-}"
 }
 
 parse_passive_patterns() {
@@ -105,16 +123,22 @@ parse_passive_patterns() {
 
 match_pattern() {
     local file="$1" pattern="$2"
+
+    # dir/** → match all files under dir/
     if [[ "$pattern" == *"/**" ]]; then
         local prefix="${pattern%/**}/"
         [[ "$file" == "$prefix"* ]] && return 0
         return 1
     fi
+
+    # *.ext → match suffix
     if [[ "$pattern" == \*.* ]]; then
         local suffix="${pattern#\*}"
         [[ "$file" == *"$suffix" ]] && return 0
         return 1
     fi
+
+    # Exact match
     [[ "$file" == "$pattern" ]] && return 0
     return 1
 }
@@ -124,7 +148,9 @@ is_passive_file() {
     shift
     local patterns=("$@")
     for pattern in "${patterns[@]}"; do
-        match_pattern "$file" "$pattern" && return 0
+        if match_pattern "$file" "$pattern"; then
+            return 0
+        fi
     done
     return 1
 }
@@ -138,8 +164,13 @@ count_changed_lines() {
     shift
     local files=("$@")
     local total=0
-    [[ ${#files[@]} -eq 0 ]] && { echo 0; return; }
 
+    if [[ ${#files[@]} -eq 0 ]]; then
+        echo 0
+        return
+    fi
+
+    # Tracked files: staged + unstaged diff lines (batch count)
     local tracked_lines
     tracked_lines=$(
         { git -C "$workspace" diff --numstat -- "${files[@]}" 2>/dev/null || true
@@ -148,6 +179,7 @@ count_changed_lines() {
     )
     total=$((total + tracked_lines))
 
+    # Untracked files: total lines count as changes
     for file in "${files[@]}"; do
         if [[ -n "$(git -C "$workspace" ls-files --others --exclude-standard -- "$file" 2>/dev/null)" ]]; then
             if [[ -f "${workspace}/${file}" ]]; then
@@ -157,6 +189,7 @@ count_changed_lines() {
             fi
         fi
     done
+
     echo "$total"
 }
 
@@ -166,8 +199,15 @@ count_changed_lines() {
 
 detect_platform() {
     local json="$1"
-    [[ -z "$json" ]] && { echo "unknown"; return; }
-    echo "$json" | grep -qE '"hook_event_name"|"tool_name"' && echo "claude_code" || echo "cursor"
+    if [[ -z "$json" ]]; then
+        echo "unknown"
+        return
+    fi
+    if echo "$json" | grep -qE '"hook_event_name"|"tool_name"'; then
+        echo "claude_code"
+    else
+        echo "cursor"
+    fi
 }
 
 # ============================================================
@@ -176,15 +216,24 @@ detect_platform() {
 
 get_workspace_root() {
     local json="$1"
+
     if [[ -n "$json" ]]; then
         local ws
         ws=$(json_workspace_root "$json")
-        [[ -n "$ws" ]] && { echo "$ws"; return; }
+        if [[ -n "$ws" ]]; then
+            echo "$ws"
+            return
+        fi
     fi
+
     for env_var in CURSOR_PROJECT_DIR CLAUDE_PROJECT_DIR WORKSPACE_ROOT PROJECT_ROOT; do
         local val="${!env_var:-}"
-        [[ -n "$val" ]] && { echo "$val"; return; }
+        if [[ -n "$val" ]]; then
+            echo "$val"
+            return
+        fi
     done
+
     echo "${PWD:-$(pwd)}"
 }
 
@@ -197,12 +246,18 @@ is_git_repo() {
 }
 
 get_change_summary() {
-    local workspace="$1" max_lines="${2:-20}"
+    local workspace="$1"
+    local max_lines="${2:-20}"
     local output
     output=$(git -C "$workspace" status --short 2>/dev/null || true)
-    [[ -z "$output" ]] && return
+
+    if [[ -z "$output" ]]; then
+        return
+    fi
+
     local total
     total=$(echo "$output" | wc -l)
+
     if [[ "$total" -gt "$max_lines" ]]; then
         echo "$output" | head -n "$max_lines"
         echo "  ... and $((total - max_lines)) more files"
@@ -226,9 +281,11 @@ json_escape() {
 }
 
 output_block() {
-    local message="$1" platform="$2"
+    local message="$1"
+    local platform="$2"
     local escaped
     escaped=$(json_escape "$message")
+
     if [[ "$platform" == "cursor" ]]; then
         echo "{\"followup_message\":\"${escaped}\"}"
     elif [[ "$platform" == "claude_code" ]]; then
@@ -245,42 +302,71 @@ output_block() {
 
 main() {
     local input=""
-    [[ ! -t 0 ]] && input=$(cat)
+    if [[ ! -t 0 ]]; then
+        input=$(cat)
+    fi
 
     if [[ -n "$input" ]]; then
-        [[ "$(json_bool "$input" "stop_hook_active")" == "true" ]] && output_allow
+        local stop_active
+        stop_active=$(json_bool "$input" "stop_hook_active")
+        if [[ "$stop_active" == "true" ]]; then
+            output_allow
+        fi
     fi
 
     local platform
     platform=$(detect_platform "$input")
+
     local workspace
     workspace=$(get_workspace_root "$input")
 
-    is_git_repo "$workspace" || output_allow
+    # Delegate to project-local script when present (committed with project)
+    local project_script="${workspace}/.vibe-x/agent-better-checkpoint/check_uncommitted.sh"
+    if [[ -f "$project_script" ]] && [[ -x "$project_script" ]]; then
+        echo "$input" | bash "$project_script"
+        exit $?
+    fi
 
+    if ! is_git_repo "$workspace"; then
+        output_allow
+    fi
+
+    # Get all changes
     local status_output
     status_output=$(git -C "$workspace" status --porcelain 2>/dev/null)
-    [[ -z "$status_output" ]] && output_allow
+
+    if [[ -z "$status_output" ]]; then
+        output_allow
+    fi
 
     # Load config
     local config_file="${workspace}/${CONFIG_FILE_NAME}"
     local -a passive_patterns=()
-    local min_changed_lines="" min_changed_files=""
+    local min_changed_lines=""
+    local min_changed_files=""
 
     if [[ -f "$config_file" ]]; then
         while IFS= read -r p; do
             [[ -n "$p" ]] && passive_patterns+=("$p")
         done < <(parse_passive_patterns "$config_file")
+
         min_changed_lines=$(parse_min_changed_lines "$config_file")
         min_changed_files=$(parse_min_changed_files "$config_file")
     fi
 
-    # Split active vs passive files
-    local -a active_files=() passive_files_list=()
+    # ---- 分离主动/被动文件 ----
+    local -a active_files=()
+    local -a passive_files_list=()
+
     while IFS= read -r line; do
         local file="${line:3}"
-        [[ "$file" == *" -> "* ]] && file="${file##* -> }"
+        # Handle rename: "old -> new"
+        if [[ "$file" == *" -> "* ]]; then
+            file="${file##* -> }"
+        fi
+        # Strip possible quotes
         file="${file#\"}" && file="${file%\"}"
+
         if [[ ${#passive_patterns[@]} -gt 0 ]] && is_passive_file "$file" "${passive_patterns[@]}"; then
             passive_files_list+=("$file")
         else
@@ -288,12 +374,18 @@ main() {
         fi
     done <<< "$status_output"
 
-    [[ ${#active_files[@]} -eq 0 ]] && output_allow "Skipped: only passive file changes (${#passive_files_list[@]} files). Patterns: ${passive_patterns[*]}"
+    # ---- No active files → only passive changes, skip ----
+    if [[ ${#active_files[@]} -eq 0 ]]; then
+        output_allow "Skipped: only passive file changes (${#passive_files_list[@]} files). Patterns: ${passive_patterns[*]}"
+    fi
 
+    # ---- No threshold config → trigger on any active change (backward compat) ----
     if [[ -z "$min_changed_lines" ]] && [[ -z "$min_changed_files" ]]; then
+        # Use original reminder logic
         build_and_output_reminder "$workspace" "$platform"
     fi
 
+    # ---- Check trigger conditions (OR) ----
     local triggered=false
     local active_file_count=${#active_files[@]}
     local active_line_count=0
@@ -302,37 +394,59 @@ main() {
     if [[ -n "$min_changed_files" ]] && [[ $active_file_count -ge $min_changed_files ]]; then
         triggered=true
     fi
+
+    # Then check line count (requires diff)
     if [[ "$triggered" != "true" ]] && [[ -n "$min_changed_lines" ]]; then
         active_line_count=$(count_changed_lines "$workspace" "${active_files[@]}")
-        [[ $active_line_count -ge $min_changed_lines ]] && triggered=true
+        if [[ $active_line_count -ge $min_changed_lines ]]; then
+            triggered=true
+        fi
     fi
 
     if [[ "$triggered" != "true" ]]; then
-        [[ $active_line_count -eq 0 ]] && active_line_count=$(count_changed_lines "$workspace" "${active_files[@]}")
+        # Compute line count (if not yet, for output)
+        if [[ $active_line_count -eq 0 ]] && [[ -n "$min_changed_lines" ]]; then
+            : # Already computed
+        elif [[ $active_line_count -eq 0 ]]; then
+            active_line_count=$(count_changed_lines "$workspace" "${active_files[@]}")
+        fi
         output_allow "Skipped: changes below threshold (${active_file_count} files, ${active_line_count} lines). Config: min_changed_files=${min_changed_files:-unset}, min_changed_lines=${min_changed_lines:-unset}"
     fi
 
+    # ---- Threshold reached, trigger commit reminder ----
     build_and_output_reminder "$workspace" "$platform"
 }
 
 build_and_output_reminder() {
-    local workspace="$1" platform="$2"
-    local changes changes_indented
+    local workspace="$1"
+    local platform="$2"
+
+    local changes
     changes=$(get_change_summary "$workspace")
+    local changes_indented
     changes_indented=$(echo "$changes" | sed 's/^/  /')
 
-    # Project-local script (this dir); fallback to global
-    local checkpoint_cmd_sh
-    local checkpoint_cmd_ps1
+    # Project-local script; fallback to global
+    local checkpoint_cmd_sh checkpoint_cmd_ps1 alloc_patch_cmd_sh alloc_patch_cmd_ps1
     if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/checkpoint.sh" ]]; then
         checkpoint_cmd_sh=".vibe-x/agent-better-checkpoint/checkpoint.sh"
     else
         checkpoint_cmd_sh="~/.vibe-x/agent-better-checkpoint/scripts/checkpoint.sh"
     fi
     if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/checkpoint.ps1" ]]; then
-        checkpoint_cmd_ps1='.\.vibe-x\agent-better-checkpoint\checkpoint.ps1'
+        checkpoint_cmd_ps1='.\\.vibe-x\\agent-better-checkpoint\\checkpoint.ps1'
     else
-        checkpoint_cmd_ps1='$env:USERPROFILE\.vibe-x\agent-better-checkpoint\scripts\checkpoint.ps1'
+        checkpoint_cmd_ps1='\$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/checkpoint.ps1'
+    fi
+    if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/alloc_patch.sh" ]]; then
+        alloc_patch_cmd_sh=".vibe-x/agent-better-checkpoint/alloc_patch.sh"
+    else
+        alloc_patch_cmd_sh="~/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.sh"
+    fi
+    if [[ -f "${workspace}/.vibe-x/agent-better-checkpoint/alloc_patch.ps1" ]]; then
+        alloc_patch_cmd_ps1='.\\.vibe-x\\agent-better-checkpoint\\alloc_patch.ps1'
+    else
+        alloc_patch_cmd_ps1='\$env:USERPROFILE/.vibe-x/agent-better-checkpoint/scripts/alloc_patch.ps1'
     fi
 
     local reminder
@@ -345,17 +459,24 @@ There are uncommitted changes in the workspace. Please create a checkpoint commi
 ${changes_indented}
 \`\`\`
 
-**Action Required**: Run the checkpoint script to commit these changes:
+**Action Required**: Allocate a patch file, write only the selected hunks for this conversation, then run the checkpoint script.
 
 **macOS/Linux:**
 \`\`\`bash
-${checkpoint_cmd_sh} \"checkpoint(<scope>): <description>\" \"<user-prompt>\" --type fallback
+PATCH_JSON=\$(${alloc_patch_cmd_sh} --workspace \"${workspace}\")
+PATCH_PATH=\$(printf '%s' \"\$PATCH_JSON\" | python3 -c 'import sys,json; print(json.load(sys.stdin)["path"])')
+# Write only the selected hunks for this conversation to \"\$PATCH_PATH\" as a unified diff patch.
+${checkpoint_cmd_sh} \"checkpoint(<scope>): <description>\" \"<user-prompt>\" --type fallback --patch-file \"\$PATCH_PATH\"
 \`\`\`
 
 **Windows (PowerShell):**
 \`\`\`powershell
-powershell -File \"${checkpoint_cmd_ps1}\" \"checkpoint(<scope>): <description>\" \"<user-prompt>\" -Type fallback
-\`\`\`"
+\$patch = powershell -File \"${alloc_patch_cmd_ps1}\" -Workspace \"${workspace}\" | ConvertFrom-Json
+# Write only the selected hunks for this conversation to \$patch.path as a unified diff patch.
+powershell -File \"${checkpoint_cmd_ps1}\" \"checkpoint(<scope>): <description>\" \"<user-prompt>\" -Type fallback -PatchFile \$patch.path
+\`\`\`
+
+If the checkpoint script returns an \`ABC_PATCH_*\` error, do not fall back to a full commit automatically. Explain the conflict and ask the user how to proceed."
 
     output_block "$reminder" "$platform"
 }

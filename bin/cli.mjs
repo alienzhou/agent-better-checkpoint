@@ -233,11 +233,14 @@ function installScripts(osType) {
 
   // 双端脚本都安装，方便跨平台使用
   copyFileSafe(join(PLATFORM_DIR, 'unix', 'checkpoint.sh'), join(scriptsDir, 'checkpoint.sh'));
+  copyFileSafe(join(PLATFORM_DIR, 'unix', 'alloc_patch.sh'), join(scriptsDir, 'alloc_patch.sh'));
   copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(hooksDir, 'check_uncommitted.sh'));
   setExecutable(join(scriptsDir, 'checkpoint.sh'));
+  setExecutable(join(scriptsDir, 'alloc_patch.sh'));
   setExecutable(join(hooksDir, 'check_uncommitted.sh'));
 
   copyFileSafe(join(PLATFORM_DIR, 'win', 'checkpoint.ps1'), join(scriptsDir, 'checkpoint.ps1'));
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'alloc_patch.ps1'), join(scriptsDir, 'alloc_patch.ps1'));
   copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(hooksDir, 'check_uncommitted.ps1'));
 
   console.log(`  Scripts → ${scriptsDir}/`);
@@ -305,12 +308,18 @@ function registerCursorHook(osType) {
 function installProjectOnly(targetDir, aiPlatform, osType) {
   const root = resolve(targetDir);
 
-  // .vibe-x/agent-better-checkpoint: checkpoint 脚本 + config
+  // .vibe-x/agent-better-checkpoint: checkpoint 脚本 + helper + config
   const vibeXBase = join(root, '.vibe-x', 'agent-better-checkpoint');
   ensureDir(vibeXBase);
   copyFileSafe(join(PLATFORM_DIR, 'unix', 'checkpoint.sh'), join(vibeXBase, 'checkpoint.sh'));
+  copyFileSafe(join(PLATFORM_DIR, 'unix', 'alloc_patch.sh'), join(vibeXBase, 'alloc_patch.sh'));
+  copyFileSafe(join(PLATFORM_DIR, 'unix', 'check_uncommitted.sh'), join(vibeXBase, 'check_uncommitted.sh'));
   copyFileSafe(join(PLATFORM_DIR, 'win', 'checkpoint.ps1'), join(vibeXBase, 'checkpoint.ps1'));
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'alloc_patch.ps1'), join(vibeXBase, 'alloc_patch.ps1'));
+  copyFileSafe(join(PLATFORM_DIR, 'win', 'check_uncommitted.ps1'), join(vibeXBase, 'check_uncommitted.ps1'));
   setExecutable(join(vibeXBase, 'checkpoint.sh'));
+  setExecutable(join(vibeXBase, 'alloc_patch.sh'));
+  setExecutable(join(vibeXBase, 'check_uncommitted.sh'));
   const configDest = join(vibeXBase, 'config.yml');
   if (!existsSync(configDest) && existsSync(CONFIG_TEMPLATE)) {
     copyFileSafe(CONFIG_TEMPLATE, configDest);
@@ -360,9 +369,22 @@ function uninstallProjectOnly(targetDir, aiPlatform) {
   const vibeXBase = join(root, '.vibe-x', 'agent-better-checkpoint');
   const skillRoot = aiPlatform === 'cursor' ? '.cursor' : '.claude';
   const skillDir = join(root, skillRoot, 'skills', SKILL_NAME);
-  if (existsSync(vibeXBase)) {
-    rmSync(vibeXBase, { recursive: true, force: true });
-    console.log(`  Removed ${vibeXBase}`);
+  const checkpointShPath = join(vibeXBase, 'checkpoint.sh');
+  const checkpointPs1Path = join(vibeXBase, 'checkpoint.ps1');
+  const allocPatchShPath = join(vibeXBase, 'alloc_patch.sh');
+  const allocPatchPs1Path = join(vibeXBase, 'alloc_patch.ps1');
+  const checkUncommittedShPath = join(vibeXBase, 'check_uncommitted.sh');
+  const checkUncommittedPs1Path = join(vibeXBase, 'check_uncommitted.ps1');
+  for (const filePath of [
+    checkpointShPath,
+    checkpointPs1Path,
+    allocPatchShPath,
+    allocPatchPs1Path,
+    checkUncommittedShPath,
+    checkUncommittedPs1Path,
+    join(vibeXBase, 'config.yml'),
+  ]) {
+    if (existsSync(filePath)) rmSync(filePath, { force: true });
   }
 
   if (existsSync(skillDir)) {

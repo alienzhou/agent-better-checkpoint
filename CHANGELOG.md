@@ -5,11 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.4] - 2026-03-09
+## [0.3.4] - 2026-03-17
 
 ### Added
 
 - **`--activate` command**: Lightweight project activation — injects checkpoint rules into `AGENTS.md` without full project-local install. Requires prior global or project-level installation. Includes installation status diagnosis with actionable guidance when prerequisites are missing.
+- **Hunk-level checkpoint flow (V1)**: Add `alloc_patch` helper scripts and `--patch-file` / `-PatchFile` support so agents can commit selected hunks through a unified diff patch instead of always staging the full workspace.
+
+### Changed
+
+- Stop hook reminder and `SKILL.md` now guide agents through the patch allocation → selected hunk patch → checkpoint flow, and explicitly instruct them to hand control back to the user when `ABC_PATCH_*` errors indicate unsafe partial commits.
 
 ### Fixed
 
