@@ -1,3 +1,6 @@
+> **⚠️ Migrated:** This repository has been merged into [`alienzhou/doraemon-skills`](https://github.com/alienzhou/doraemon-skills). Please use the new monorepo for the latest content and installation. This repo will be archived — please do not submit new changes here.
+
+
 # Agent Better Checkpoint (ABC)
 
 **One-line install, zero config.** Turns AI agent edits into transparent, queryable Git commits.

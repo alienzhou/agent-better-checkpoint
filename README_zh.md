@@ -1,3 +1,6 @@
+> **⚠️ 已迁移：** 本仓库已合并迁移至 [`alienzhou/doraemon-skills`](https://github.com/alienzhou/doraemon-skills)。请改用新仓库安装 / 查看最新内容。本仓库即将归档，请勿再向本仓库提交。
+
+
 # Agent Better Checkpoint
 
 **一行命令安装，零配置。** 将 AI Agent 的编辑自动转为透明、可查询的 Git commit。
